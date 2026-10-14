@@ -14,7 +14,7 @@ tags:
 
 # Fish Audio Drama 3 Windows runtime — 0.1.0rc1
 
-This card documents the Windows runtime `0.1.0rc1` and its local conversion recipe for the pinned Fish Audio Drama 3 checkpoint. A Hugging Face repository is planned for converted model and codec bundles; until it is published, create them with the source conversion workflow. The original checkpoint is available from [Fish Audio's pinned source](https://huggingface.co/fishaudio/drama-3/tree/dd64a85cd82e9521f7202610ede97b367fc83946). Source code repository (planned): [GitHub project](https://github.com/Eng-Ahmd/drama-3-windows).
+This card documents the Windows runtime `0.1.0rc1` and its local conversion recipe for the pinned Fish Audio Drama 3 checkpoint. A Hugging Face repository is planned for converted model and codec bundles; until it is published, create them with the source conversion workflow. The original checkpoint is available from [Fish Audio's pinned source](https://huggingface.co/fishaudio/drama-3/tree/dd64a85cd82e9521f7202610ede97b367fc83946). Source code: [GitHub repository](https://github.com/Eng-Ahmd/drama-3-windows).
 
 ## Model and runtime
 
@@ -42,11 +42,13 @@ The Windows runtime supports local Drama 3 inference, development, and evaluatio
 
 The native codec reproduced all 850 reference acoustic codes in the checked example. Decoding the corresponding 87 frames returned the same 178,176 samples as the reference decode, with relative RMSE 1.74×10⁻⁶. This is codec component evidence; it does not establish perceptual parity across general audio.
 
-In one matched English voice-reference example, the reference and generated audio both scored 0.0 WER with the same Faster Whisper base.en evaluator. The original clip is 9.195 seconds long and the generated clip is 7.895 seconds long; these are audio durations, not synthesis latency. This is one sample and must not be read as a speed benchmark, aggregate ASR score, or speaker-similarity result. Listening found the generated voice close in that example, with a difference in the sigh. There is no objective speaker-similarity baseline.
+In one matched English voice-reference example, the reference and generated audio both scored 0.0 WER with the same Faster Whisper base.en evaluator. The original clip is 9.195 seconds long and the generated clip is 7.895 seconds long; these are audio durations, not synthesis latency. Listening found the generated voice close in that example, with a difference in the sigh. There is no objective speaker-similarity baseline.
+
+A separate guarded CLI run reached EOS at frame 169, producing 7.848 seconds of audio in 39 seconds. ASR recognized the requested words but inserted “Haha” (WER 0.0714). This is a single-run observation, not a speed or aggregate quality result.
 
 One 12-GPU-expert-layer run on the 16 GiB target ended with 2.67 GiB of GPU memory free. Native allocations are not fully reflected by PyTorch allocator counters, and this observation does not establish a maximum safe profile.
 
-The frozen numbers prompt at seed 124 reached its 384-frame cap without EOS; ASR recognized only the first sentence. This remains an unresolved generation failure. A diagnostic reconstructed BF16 expert arithmetic from the FP8 source weights and reached EOS at frame 128, while the native Q4 run reached its 384-frame cap. A controlled Q4-in-PyTorch-BF16 comparison is still running, so the cause is not yet isolated. Do not treat finite partial audio as a successful completion.
+The frozen numbers prompt at seed 124 reached its 384-frame cap without EOS; ASR recognized only the first sentence. This remains an unresolved generation failure. A diagnostic reconstructed BF16 expert arithmetic from the FP8 source weights and reached EOS at frame 128, while the native Q4 run reached its 384-frame cap. The controlled Q4-in-PyTorch-BF16 comparison was stopped by the watchdog at frame 160 and is incomplete; no causal conclusion is available. Do not treat finite partial audio as a successful completion.
 
 The [quality report](https://github.com/Eng-Ahmd/drama-3-windows/blob/main/docs/public/QUALITY.md) describes the preview corpus, watchdog thresholds, evaluation methods, and qualification gaps. Current evidence does not establish general intelligibility, Chinese quality, speaker similarity, expressive fidelity, artifact rates, long-session stability, cancellation recovery, or production readiness.
 

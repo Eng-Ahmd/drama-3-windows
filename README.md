@@ -2,7 +2,7 @@
 
 This repository contains the **Windows release 0.1.0rc1** for running Fish Audio Drama 3 on Windows. It combines a PyTorch model path with native GGML expert execution and a native audio codec. It is a hybrid Windows runtime, not a standalone C++ model engine.
 
-The project includes a direct converter for the pinned Drama 3 checkpoint, an offline synthesis CLI, native CPU and CUDA components, and guarded evaluation tools. Model weights and compiled binaries are separate from this source tree. A Hugging Face repository is planned for the converted bundle and codec; until it is published, use the local conversion steps in the installation guide. Obtain model files under their applicable license terms and build native components locally. The planned [GitHub source repository](https://github.com/Eng-Ahmd/drama-3-windows) will host the source code.
+The project includes a direct converter for the pinned Drama 3 checkpoint, an offline synthesis CLI, native CPU and CUDA components, and guarded evaluation tools. Model weights and compiled binaries are separate from this source tree. A Hugging Face repository is planned for the converted bundle and codec; until it is published, use the local conversion steps in the installation guide. Obtain model files under their applicable license terms and build native components locally. Source code is hosted at the [GitHub repository](https://github.com/Eng-Ahmd/drama-3-windows).
 
 ## Start here
 
@@ -20,9 +20,9 @@ The conversion recipe stores expert weights as Q4_K, the backbone as Q8_0, sensi
 
 ## Current evidence and limits
 
-The native codec reproduced all 850 reference acoustic codes in the checked example. Decoding 87 frames produced the same 178,176 samples as the reference decode, with relative RMSE 1.74×10⁻⁶. One matched English voice-reference example had 0.0 Whisper WER for both the original and generated audio. These are component and single-example results, not aggregate speech-quality or speaker-similarity claims.
+The native codec reproduced all 850 reference acoustic codes in the checked example. Decoding 87 frames produced the same 178,176 samples as the reference decode, with relative RMSE 1.74×10⁻⁶. One matched English voice-reference example had 0.0 Whisper WER for both the original and generated audio. A separate guarded CLI run completed at frame 169, producing 7.848 seconds of audio in 39 seconds; ASR recognized the requested words but inserted “Haha” (WER 0.0714). This is one sample, not a speech-quality or speed benchmark.
 
-The preview also has an unresolved failure: the frozen numbers prompt at seed 124 reached its 384-frame limit without EOS, and ASR recognized only the first sentence. A diagnostic reconstructed BF16 expert arithmetic from the FP8 source weights and reached EOS at frame 128, while the native Q4 run hit the 384-frame limit without EOS. A controlled Q4-in-PyTorch-BF16 comparison is still running, so the cause is not yet isolated. Production qualification, real-time performance, and clean-machine installation have not been established. See the [quality report](docs/public/QUALITY.md) for the full record.
+The preview also has an unresolved failure: the frozen numbers prompt at seed 124 reached its 384-frame limit without EOS, and ASR recognized only the first sentence. A diagnostic reconstructed BF16 expert arithmetic from the FP8 source weights and reached EOS at frame 128, while the native Q4 run hit the 384-frame limit without EOS. The controlled Q4-in-PyTorch-BF16 comparison was stopped by the watchdog at frame 160 and is incomplete; no causal conclusion is available. Production qualification, real-time performance, and clean-machine installation have not been established. See the [quality report](docs/public/QUALITY.md) for the full record.
 
 ## Licensing
 

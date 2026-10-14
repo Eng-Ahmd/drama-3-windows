@@ -86,10 +86,7 @@ The first matched English example produced zero WER for both official and
 generated audio using Faster Whisper 1.2.1, CTranslate2 4.8.3 and the frozen
 `Systran/faster-whisper-base.en` revision
 `3d3d5dee26484f91867d81cb899cfcf72b96be6c`. This is one example, not an
-aggregate quality result. The initial preview then stopped at the numbers
-case: it reached its 384-frame limit without EOS, and ASR recognized only
-the first sentence. That failure must be investigated; a finite waveform
-does not make the request complete.
+aggregate quality result. The frozen case failed: it reached its 384-frame limit without EOS, and ASR recognized only the first sentence. A finite waveform does not make the request complete. A separate guarded CLI run reached EOS at frame 169 and produced 7.848 seconds of audio in 39 seconds. ASR recognized the requested words but inserted “Haha” (WER 0.0714). This single-run observation is not an aggregate quality or speed result. The controlled Q4-in-PyTorch-BF16 comparison was stopped by the watchdog at frame 160 and is incomplete; it supports no causal conclusion.
 
 ## Remaining release gates
 

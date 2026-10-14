@@ -1,18 +1,25 @@
 # Installation
 
-This guide builds the Windows release `0.1.0rc1` on Windows 11. The current environment has been exercised with Python 3.13, PyTorch 2.13.0+cu132, Visual Studio 2022, and CUDA Toolkit 13.3. A clean-machine installation has not yet been qualified.
+This guide installs or builds the Windows release `0.1.0rc1` on Windows 11. The current environment has been exercised with Python 3.13, PyTorch 2.13.0+cu132, Visual Studio 2022, and CUDA Toolkit 13.3. A clean-machine installation has not yet been qualified.
 
 ## Prerequisites
 
 - Windows 11 x64 and Python 3.13.
-- Visual Studio 2022 C++ build tools, CMake, and Ninja.
+- Visual Studio 2022 C++ build tools, CMake, and Ninja are required only when compiling the runtime from source.
 - For CUDA builds, an NVIDIA driver and CUDA Toolkit 13.3. The observed target was an RTX 5080 Laptop GPU with 16 GiB of VRAM.
 - The pinned Drama 3 checkpoint files from Hugging Face, accessed under the model's license. A Hugging Face repository is planned for the converted model and codec bundles; until it is published, create them locally with the conversion steps below. This source repository does not bundle weights.
 - Enough local disk for the source checkpoint, model and codec bundles, and build outputs. A complete converted model bundle is about 21.67 GiB and the codec about 1.46 GiB.
 
+## Use the prebuilt Windows runtime
+
+The `fish-drama3-windows-runtime-0.1.0rc1-win-x64.zip` release archive contains the tested CPU and CUDA runtime DLLs. Extract it at the repository root so the files land under `builds/drama3-inspect/Release` and `builds/drama3-cuda/Release`; do not rename those directories. Check the included `SHA256SUMS.txt` against the extracted DLL and license files before use.
+
+Install the Microsoft Visual C++ 2015–2022 x64 Redistributable separately; it is not included. CUDA inference also requires an NVIDIA driver and CUDA Toolkit 13.3 or newer. NVIDIA and Microsoft DLLs are not redistributed in the archive. The Python environment and pinned Fish Speech reference checkout are still required; run `scripts/bootstrap.ps1` to fetch and verify source pins. The prebuilt archive avoids compiling the runtime libraries. Converting a checkpoint locally still requires the pinned CPU donor quantizer produced by the source build workflow below.
+
+The archive does not include model weights. Use it with a converted model and codec bundle that you have obtained or built under their applicable licenses. Use `--gpu-expert-layers 0` for the CPU expert bridge; CUDA expert placement requires a compatible GPU and the CUDA prerequisites above.
 ## Create the Python environment
 
-Open a PowerShell session with the Visual Studio C++ tools available. Create and activate a virtual environment, then install the CUDA-enabled PyTorch build from the official PyTorch wheel index. PyTorch is intentionally separate from the PyPI requirements file so a generic CPU or unrelated CUDA wheel is not selected accidentally.
+Create and activate a virtual environment in PowerShell, then install the CUDA-enabled PyTorch build from the official PyTorch wheel index. Visual Studio C++ tools are needed only for source builds. PyTorch is intentionally separate from the PyPI requirements file so a generic CPU or unrelated CUDA wheel is not selected accidentally.
 
 ```powershell
 py -3.13 -m venv .venv
