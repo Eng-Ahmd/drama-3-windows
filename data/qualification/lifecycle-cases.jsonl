@@ -1,0 +1,2 @@
+{"id": "en-plain", "text": "The quick brown fox jumps over the lazy dog.", "language": "en", "max_frames": 256, "seed": 123}
+{"id": "speaker-negative", "text": "<|speaker:16|> This must be rejected.", "expect_reject": true, "max_frames": 128, "seed": 129}

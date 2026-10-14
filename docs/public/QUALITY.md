@@ -97,6 +97,20 @@ aggregate quality result. The original seed-124 numbers case failed: it reached 
 
 ## Evaluation scope and known behavior
 
+The controlled lifecycle soak completed 7,208.8 seconds after warmup: 713
+successful speech requests and 143 rejected-input recovery cycles. Every speech
+request reached EOS and produced the same seeded acoustic-code hash. Maximum
+warmed process-private-memory growth was 430,080 bytes; measured Torch allocation
+and total CUDA-use deltas were zero. Request samples retained at least 2.52 GiB
+GPU free and 74.23 GiB host RAM free. The external watchdog exited successfully.
+This repeated two-case workload measures lifecycle stability and validation
+recovery, not cancellation or varied-content speech quality. See the
+[results](../../data/qualification/windows-010-lifecycle-report.json) and run it with:
+
+```powershell
+python -m fish_drama3.watchdog --output runs/lifecycle-watchdog -- python -m fish_drama3.qualification --corpus data/qualification/lifecycle-cases.jsonl --output runs/lifecycle --mode soak --soak-seconds 7200 --min-requests 200 --failure-cycles 50 --chunk-length 200 --gpu-expert-layers 12
+```
+
 A separate run of the twelve functional cases used runtime 0.1.0 defaults: seed 123 for valid inputs, 200-character chunking and twelve GPU expert layers. All nine valid inputs reached EOS for every segment, all three invalid inputs were rejected, and the short anchor replay produced identical acoustic codes. Measured GPU, Torch and process memory drift at the final warmed replay was zero bytes at the same cache capacity. This is a functional completion check; it does not measure aggregate speech quality or replace the original mixed-seed corpus, whose seed-124 failure remains recorded.
 
 Runtime 0.1.0 adds bounded paragraph generation with audio-history conditioning.

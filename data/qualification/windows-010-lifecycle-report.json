@@ -1,0 +1,32 @@
+{
+  "valid_requests": 713,
+  "rejected_inputs": 143,
+  "all_checks_passed": true,
+  "code_hash_count": 1,
+  "min_request_gpu_free_bytes": 2708471808,
+  "min_request_host_free_bytes": 79706578944,
+  "max_warmed_deltas": {
+    "private_bytes": 430080,
+    "torch_allocated_bytes": 0,
+    "cuda_used_bytes": 0
+  },
+  "schema": "fish-drama3-lifecycle-report-v1",
+  "runtime_version": "0.1.0",
+  "tested_source_commit": "6af07cdae5cda8b539c7ade25bddb52e357ad566",
+  "warm_seconds": 7208.794546099962,
+  "finished_utc": "2026-10-14T09:21:18.376994+00:00",
+  "workload": "Repeated seeded English sentence and invalid speaker tag; request validation recovery only.",
+  "hardware": "RTX 5080 Laptop GPU (16 GiB), Windows 11, 128 GiB RAM",
+  "scope": "Controlled lifecycle stability; no cancellation, acoustic quality or production coverage claim.",
+  "model_sha256": "9d300114de29290c666e588d3b8530f595a234034fa706e60abc01814ab35cfc",
+  "codec_sha256": "f89f062ea81df81e45189de53e7e21ad11c760699a535446b4b4f3f977c2112f",
+  "chunk_length": 200,
+  "gpu_expert_layers": 12,
+  "threads": 8,
+  "seed": 123,
+  "limits": {
+    "gpu_free_gib": 1.0,
+    "host_free_gib": 8.0,
+    "max_commit_percent": 90.0
+  }
+}
