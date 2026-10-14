@@ -19,6 +19,14 @@ The command checks the SHA-256 values recorded in the model and codec manifests.
 
 Defaults are seed 123, temperature 0.7, top-p 0.7, top-k 30, 512 maximum frames, eight CPU threads, and twelve GPU expert layers. Change them explicitly when comparing runs and keep the JSON sidecars. These settings do not guarantee deterministic results across different hardware or software environments.
 
+Long text is split at natural boundaries into segments of at most 200 characters.
+The preceding segment's generated audio conditions the next segment through the
+pinned model's history API. The final codec decode runs on the combined acoustic
+codes. `--max-frames` is one shared budget for the entire request; all segments
+must reach EOS for a complete output. The JSON sidecar records each segment.
+Use `--chunk-length` to adjust this bound, or `0` to reproduce unsegmented runs.
+At most 32 segments are accepted; speaker markers and expression tags stay whole.
+
 ## Voice references
 
 For voice-reference conditioning, provide an audio file and its transcript together:

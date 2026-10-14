@@ -16,11 +16,12 @@ import numpy as np
 import soundfile as sf
 
 from fish_drama3.codec_adapter import CodecBridge, sha_file
+from fish_drama3 import __version__
 
 
 def parse_options() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--version", action="version", version="fish-drama3 0.1.0rc1")
+    parser.add_argument("--version", action="version", version=f"fish-drama3 {__version__}")
     commands = parser.add_subparsers(dest="command", required=True)
     synth = commands.add_parser("synth")
     synth.add_argument("--bundle", type=Path, required=True)
@@ -32,6 +33,8 @@ def parse_options() -> argparse.Namespace:
     synth.add_argument("--gpu-expert-layers", type=int, default=12)
     synth.add_argument("--threads", type=int, default=8)
     synth.add_argument("--max-frames", type=int, default=512)
+    synth.add_argument("--chunk-length", type=int, default=200,
+                       help="Maximum text characters per segment; 0 disables segmentation")
     synth.add_argument("--seed", type=int, default=123)
     synth.add_argument("--temperature", type=float, default=0.7)
     synth.add_argument("--top-p", type=float, default=0.7)
@@ -44,6 +47,8 @@ def parse_options() -> argparse.Namespace:
         parser.error("GPU expert layers must be 0..16; threads must be 1..256")
     if not 1 <= args.max_frames <= 2048 or not args.text.strip():
         parser.error("Supply nonempty text and --max-frames 1..2048")
+    if args.chunk_length != 0 and not 32 <= args.chunk_length <= 2000:
+        parser.error("Chunk length must be 0 or 32..2000 characters")
     if bool(args.reference_audio) != bool(args.reference_text):
         parser.error("Reference audio and transcript must be supplied together")
     if not np.isfinite(args.temperature) or args.temperature <= 0:
@@ -136,10 +141,14 @@ def publish_wave(path: Path, audio: np.ndarray, metrics: dict) -> None:
 
 def synthesize(args: argparse.Namespace) -> dict:
     import torch
-    from fish_drama3.hybrid import build_drama3_prompt, generate_drama3, load_model
+    from fish_drama3.hybrid import load_model
+    from fish_drama3.generation import generate_text, validate_drama3_text
 
     if args.output.exists() or args.output.with_suffix(".json").exists():
         raise FileExistsError("Refusing to replace an existing audio result")
+    validate_drama3_text(args.text, "text")
+    if args.reference_text:
+        validate_drama3_text(args.reference_text, "reference")
     identity = verify_assets(args.bundle, args.codec)
     os.environ["FISH_DRAMA3_CUDA_GRAPH"] = "0"
     torch.set_num_threads(args.threads)
@@ -154,10 +163,8 @@ def synthesize(args: argparse.Namespace) -> dict:
         load_seconds = time.perf_counter() - load_started
         try:
             texts, codes = ([args.reference_text], [reference]) if reference is not None else ([], [])
-            prompt = build_drama3_prompt(args.text, model.tokenizer, model.config, texts, codes)
             started = time.perf_counter()
-            frames, reason = generate_drama3(model, prompt, max_new_tokens=args.max_frames,
-                temperature=args.temperature, top_p=args.top_p, top_k=args.top_k)
+            frames, reason, segments = generate_text(model, args, texts, codes)
             if reason != "eos" and not args.allow_partial:
                 raise RuntimeError("Frame limit reached; no complete WAV published. Increase --max-frames")
             if len(frames) == 0:
@@ -168,10 +175,11 @@ def synthesize(args: argparse.Namespace) -> dict:
                 sampling=dict(temperature=args.temperature, top_p=args.top_p, top_k=args.top_k),
                 gpu_expert_layers=args.gpu_expert_layers, threads=args.threads,
                 finish_reason=reason, complete=reason == "eos", frames=len(frames),
+                chunk_length=args.chunk_length, segments=segments,
                 audio_seconds=len(audio) / 44100, generation_seconds=generated,
                 synthesis_seconds=time.perf_counter() - started, load_seconds=load_seconds,
                 reference=source, peak_torch_vram_bytes=torch.cuda.max_memory_allocated(),
-                peak_abs=float(np.max(np.abs(audio))), runtime="hybrid-windows-0.1.0rc1")
+                peak_abs=float(np.max(np.abs(audio))), runtime=f"hybrid-windows-{__version__}")
             if metrics["peak_abs"] > 1:
                 raise RuntimeError("Waveform exceeds PCM full scale; no clipped WAV published")
             publish_wave(args.output, audio, metrics)

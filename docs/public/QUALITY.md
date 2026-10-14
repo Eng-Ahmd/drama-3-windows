@@ -97,6 +97,23 @@ aggregate quality result. The frozen case failed: it reached its 384-frame limit
 
 ## Remaining release gates
 
+Runtime 0.1.0 adds bounded paragraph generation with audio-history conditioning.
+The previously stalled three-sentence passage completed at seed 123 in two
+segments, both reaching EOS, for 304 frames and 14.12 seconds of audio. Frozen
+ASR recognized all sentences; WER was 2.44% from `twenty` versus `20`. The longest
+20 ms RMS interval below 1e-4 full scale was 20 ms, compared with the unsegmented
+seed-123 run's 26.86-second silent tail and missing final sentence. This is one
+controlled regression, not a guarantee for every paragraph. The short reference
+clone regression produced a byte-identical PCM WAV to its prior CLI result.
+
+Chinese evaluation used the separate multilingual `Systran/faster-whisper-base`
+checkpoint at revision `ebe41f70d5b6dfa9166e2c581c45c9c0cfc57b66`, CPU int8,
+beam size five and temperature zero. The frozen CER normalizer removes only
+punctuation and whitespace after NFKC. Chinese plain speech had zero CER; the
+cross-language clone had 13.33% CER from two homophonous character substitutions
+(`克隆` versus `课龙`). This may reflect ASR ambiguity and does not establish
+speaker similarity or overall Chinese quality.
+
 A supplemental guarded run completed names, expressive tags, canonical speaker
 tags, English and Chinese voice references, a longer passage, three invalid
 inputs, and an identical seeded replay after those requests. All valid requests

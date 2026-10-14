@@ -20,7 +20,7 @@ from safetensors import safe_open
 
 from fish_drama3.convert import dest_name, fp8_block_reconstruct, sha_file, write_codec
 from fish_drama3.gguf_stream import StreamingGGUFWriter, T_BOOL, T_STRING
-from fish_drama3.native_quant import DLL_PATH, Q4_K, Q8_0, TYPE_SIZES, quantize
+from fish_drama3.native_quant import Q4_K, Q8_0, TYPE_SIZES, library_path, quantize
 
 REVISION = "dd64a85cd82e9521f7202610ede97b367fc83946"
 RECIPE = "Q4_K-experts_Q8_0-backbone"
@@ -290,7 +290,7 @@ def make_manifest(staging: Path, record: dict, codec: dict | None, sources: dict
             "revision": REVISION, "complete": complete, "status": "validated-conversion",
             "model": record, "codec": codec, "source_files": sources,
             "model_sha256": sha_file(staging / "model.gguf"),
-            "quantizer_sha256": sha_file(DLL_PATH),
+            "quantizer_sha256": sha_file(library_path()),
             "seconds": time.monotonic() - started,
             "quality_qualified": False, "runtime_qualified": False}
 

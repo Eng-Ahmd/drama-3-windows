@@ -23,7 +23,7 @@ PREBUILT_DLL_PATH = Path(__file__).resolve().parents[1] / "builds/drama3-inspect
 @lru_cache(maxsize=1)
 def _library() -> ctypes.CDLL:
     """Bind the ABI declared in the pinned ggml/include/ggml.h."""
-    path = DLL_PATH if DLL_PATH.is_file() else PREBUILT_DLL_PATH
+    path = library_path()
     if not path.is_file():
         raise FileNotFoundError("Install the prebuilt runtime or build the pinned CPU GGML library")
     try:
@@ -49,6 +49,11 @@ def _library() -> ctypes.CDLL:
         if actual != (block, size):
             raise RuntimeError(f"GGML ABI mismatch for type {kind}: {actual}")
     return library
+
+
+def library_path() -> Path:
+    """Return the installed quantizer used for binding and artifact provenance."""
+    return DLL_PATH if DLL_PATH.is_file() else PREBUILT_DLL_PATH
 
 
 def _validate(array: np.ndarray, ggml_type: int) -> tuple[int, int, int]:

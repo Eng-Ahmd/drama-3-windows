@@ -12,9 +12,9 @@ tags:
   - windows
 ---
 
-# Fish Audio Drama 3 Windows runtime — 0.1.0rc1
+# Fish Audio Drama 3 Windows runtime — 0.1.0
 
-This card documents the Windows runtime `0.1.0rc1` and its local conversion recipe for the pinned Fish Audio Drama 3 checkpoint. A Hugging Face repository is planned for converted model and codec bundles; until it is published, create them with the source conversion workflow. The original checkpoint is available from [Fish Audio's pinned source](https://huggingface.co/fishaudio/drama-3/tree/dd64a85cd82e9521f7202610ede97b367fc83946). Source code: [GitHub repository](https://github.com/Eng-Ahmd/drama-3-windows).
+This card documents the Windows runtime `0.1.0` and its local conversion recipe for the pinned Fish Audio Drama 3 checkpoint. A Hugging Face repository is planned for converted model and codec bundles; until it is published, create them with the source conversion workflow. The original checkpoint is available from [Fish Audio's pinned source](https://huggingface.co/fishaudio/drama-3/tree/dd64a85cd82e9521f7202610ede97b367fc83946). Source code: [GitHub repository](https://github.com/Eng-Ahmd/drama-3-windows).
 
 ## Model and runtime
 
@@ -36,7 +36,7 @@ Inference is hybrid: PyTorch executes the backbone and audio tower, native GGML 
 
 ## Intended use
 
-The Windows runtime supports local Drama 3 inference, development, and evaluation. It is not production-qualified, not a real-time performance promise, and not a generic GGUF model for other engines. Use voice-reference audio only when you have the necessary rights and the speaker's consent.
+The Windows runtime supports local Drama 3 inference, development, and evaluation. Synthesis is offline and uses this matching runtime; generic GGUF engines do not implement its model graph. Use voice-reference audio only when you have the necessary rights and the speaker's consent.
 
 ## Evaluation
 
@@ -48,9 +48,11 @@ A separate guarded CLI run reached EOS at frame 169, producing 7.848 seconds of 
 
 One 12-GPU-expert-layer run on the 16 GiB target ended with 2.67 GiB of GPU memory free. Native allocations are not fully reflected by PyTorch allocator counters, and this observation does not establish a maximum safe profile.
 
-The frozen numbers prompt at seed 124 reached its 384-frame cap without EOS; ASR recognized only the first sentence. This remains an unresolved generation failure. A diagnostic reconstructed BF16 expert arithmetic from the FP8 source weights and reached EOS at frame 128, while the native Q4 run reached its 384-frame cap. The controlled Q4-in-PyTorch-BF16 comparison was stopped by the watchdog at frame 160 and is incomplete; no causal conclusion is available. Do not treat finite partial audio as a successful completion.
+Runtime 0.1.0 generates long requests in bounded text segments with audio-history conditioning. The checked three-sentence passage completed all text in 14.12 seconds of audio, with a longest measured near-silent interval of 20 ms. The short reference-clone regression produced the same PCM WAV bytes as the previous CLI path.
 
-The [quality report](https://github.com/Eng-Ahmd/drama-3-windows/blob/main/docs/public/QUALITY.md) describes the preview corpus, watchdog thresholds, evaluation methods, and qualification gaps. Current evidence does not establish general intelligibility, Chinese quality, speaker similarity, expressive fidelity, artifact rates, long-session stability, cancellation recovery, or production readiness.
+Four short English checks had zero ASR WER. Chinese plain speech had zero CER with a pinned multilingual evaluator; a cross-language clone had 13.33% CER from two homophonous character substitutions. These are individual intelligibility checks rather than aggregate quality or speaker-similarity scores.
+
+The recorded numbers prompt can stall at seed 124; the default seed 123 completed both sentences. Finite partial audio is marked incomplete and requires explicit opt-in. The [quality report](https://github.com/Eng-Ahmd/drama-3-windows/blob/main/docs/public/QUALITY.md) retains the failing runs, controlled source-history comparisons and remaining long-session, cancellation, acoustic-holdout and clean-machine checks.
 
 ## Data and provenance
 

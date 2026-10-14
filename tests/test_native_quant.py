@@ -6,6 +6,18 @@ import pytest
 from fish_drama3 import native_quant
 
 
+def test_prebuilt_quantizer_is_used_for_conversion_provenance(tmp_path, monkeypatch) -> None:
+    from fish_drama3 import direct
+
+    missing = tmp_path / "missing.dll"
+    prebuilt = tmp_path / "prebuilt.dll"
+    prebuilt.write_bytes(b"pinned quantizer")
+    monkeypatch.setattr(native_quant, "DLL_PATH", missing)
+    monkeypatch.setattr(native_quant, "PREBUILT_DLL_PATH", prebuilt)
+    assert direct.library_path() == prebuilt
+    assert direct.sha_file(direct.library_path()) == direct.sha_file(prebuilt)
+
+
 @pytest.mark.parametrize("kind,relative_error", [(8, 0.01), (12, 0.10)])
 def test_quantization_roundtrip(kind: int, relative_error: float) -> None:
     source = np.random.default_rng(2718).normal(size=(3, 1024)).astype(np.float32)
