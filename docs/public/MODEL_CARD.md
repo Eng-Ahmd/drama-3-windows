@@ -1,6 +1,6 @@
 ---
 license: other
-license_name: Fish Audio Community License v1.0
+license_name: fish-audio-community-license-v1.0
 license_link: https://huggingface.co/fishaudio/drama-3/blob/dd64a85cd82e9521f7202610ede97b367fc83946/LICENSE
 base_model: fishaudio/drama-3
 base_model_relation: quantized
@@ -14,7 +14,9 @@ tags:
 
 # Fish Audio Drama 3 Windows runtime — 0.1.0
 
-This card documents the Windows runtime `0.1.0` and its local conversion recipe for the pinned Fish Audio Drama 3 checkpoint. A Hugging Face repository is planned for converted model and codec bundles; until it is published, create them with the source conversion workflow. The original checkpoint is available from [Fish Audio's pinned source](https://huggingface.co/fishaudio/drama-3/tree/dd64a85cd82e9521f7202610ede97b367fc83946). Source code: [GitHub repository](https://github.com/Eng-Ahmd/drama-3-windows).
+This repository provides the Drama 3 Q4_K expert / Q8_0 backbone model and separate native-codec bundle for the [Windows runtime](https://github.com/Eng-Ahmd/drama-3-windows). Built with Fish Audio. The pinned upstream checkpoint is [Fish Audio Drama 3](https://huggingface.co/fishaudio/drama-3/tree/dd64a85cd82e9521f7202610ede97b367fc83946).
+
+Download `model/model.gguf` with `model/manifest.json`, and `codec/codec.gguf` with `codec/manifest.json`. These files use the custom `fish_drama3` architecture and require the matching runtime. Follow its [installation guide](https://github.com/Eng-Ahmd/drama-3-windows/blob/main/docs/public/INSTALL.md) for the Windows libraries and Python environment.
 
 ## Model and runtime
 
@@ -28,7 +30,7 @@ The source checkpoint combines FP8 and BF16 tensors. The converter streams it in
 - Audio tower matrices: BF16. Codec learned weights: F32, with original BF16 RoPE tables.
 - GGUF custom architecture: `fish_drama3`, requiring this repository's matching runtime rather than generic llama.cpp support.
 
-The converted model contains 925 tensors and 23,270,209,984 bytes (about 21.67 GiB). The separate V3 codec bundle contains 458 tensors and 1,568,779,744 bytes (about 1.46 GiB). Those sizes describe the current local conversion and are not download artifacts attached to this card.
+The converted model contains 925 tensors and 23,270,209,984 bytes (about 21.67 GiB). The separate V3 codec bundle contains 458 tensors and 1,568,779,744 bytes (about 1.46 GiB). The manifests include complete file and tensor hashes for verification.
 
 ### Runtime compatibility
 
@@ -53,6 +55,12 @@ Runtime 0.1.0 generates long requests in bounded text segments with audio-histor
 Four short English checks had zero ASR WER. Chinese plain speech had zero CER with a pinned multilingual evaluator; a cross-language clone had 13.33% CER from two homophonous character substitutions. These are individual intelligibility checks rather than aggregate quality or speaker-similarity scores.
 
 The recorded numbers prompt can stall at seed 124; the default seed 123 completed both sentences. Finite partial audio is marked incomplete and requires explicit opt-in. The [quality report](https://github.com/Eng-Ahmd/drama-3-windows/blob/main/docs/public/QUALITY.md) retains the failing runs, controlled source-history comparisons and remaining long-session, cancellation, acoustic-holdout and clean-machine checks.
+
+The Windows runtime also completed a guarded two-hour lifecycle soak with 713
+successful speech requests and 143 invalid-input recovery cycles. The repeated
+seeded sentence retained identical acoustic codes; measured Torch allocation
+and CUDA-use drift were zero. This controlled workload checks runtime stability;
+varied-content quality and cancellation have separate evaluation limits.
 
 ## Data and provenance
 

@@ -24,6 +24,8 @@ $allowlist = @(
     'fish_drama3/hybrid.py', 'fish_drama3/codec_adapter.py', 'fish_drama3/watchdog.py',
     'fish_drama3/qualification.py',
     'data/qualification/cases.jsonl',
+    'data/qualification/lifecycle-cases.jsonl',
+    'data/qualification/windows-010-lifecycle-report.json',
     'native/CMakeLists.txt', 'native/cuda/CMakeLists.txt',
     'native/codec_bridge.cpp', 'native/codec_ops.cpp', 'native/experts_bridge.cpp',
     'native/model_inspect.cpp', 'native/attention_fixture.cpp',
@@ -56,6 +58,8 @@ $requiredPaths = @(
     'tests/test_cli.py', 'tests/test_codec_adapter.py', 'tests/test_native_quant.py',
     'tests/test_hybrid.py', 'tests/test_qualification.py', 'scripts/bootstrap.ps1',
     'scripts/build.ps1', 'tests/test_watchdog.py', 'data/qualification/cases.jsonl',
+    'data/qualification/lifecycle-cases.jsonl',
+    'data/qualification/windows-010-lifecycle-report.json',
     'docs/public/INSTALL.md', 'docs/public/USER_GUIDE.md',
     'docs/public/MODEL_CARD.md', 'docs/public/QUALITY.md',
     'scripts/package-source.ps1'
