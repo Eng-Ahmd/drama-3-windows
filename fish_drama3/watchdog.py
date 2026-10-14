@@ -3,14 +3,53 @@ from __future__ import annotations
 
 import argparse
 import ctypes
+import errno
 import json
 import os
 import subprocess
 import threading
 import time
 from dataclasses import dataclass
+from contextlib import contextmanager
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Callable
+
+DEFAULT_GPU_LOCK = Path(__file__).resolve().parents[1] / "artifacts/gpu-watchdog.lock"
+
+
+@contextmanager
+def guarded_job_lock(path: Path = DEFAULT_GPU_LOCK) -> Iterator[None]:
+    """Nonblocking process lease, released by the OS if its owner exits."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a+b") as stream:
+        stream.seek(0)
+        try:
+            if os.name == "nt":
+                import msvcrt
+                msvcrt.locking(stream.fileno(), msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+                fcntl.flock(stream.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError as error:
+            if error.errno not in (errno.EACCES, errno.EAGAIN, errno.EDEADLK):
+                raise
+            raise RuntimeError(
+                f"Another guarded GPU job holds {path.resolve()}; wait for it to finish "
+                "or stop it through its STOP switch. No child was launched."
+            ) from error
+        try:
+            stream.seek(0, os.SEEK_END)
+            if stream.tell() == 0:
+                stream.write(b"\0")
+                stream.flush()
+            yield
+        finally:
+            stream.seek(0)
+            if os.name == "nt":
+                msvcrt.locking(stream.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
 
 
 class MemoryStatus(ctypes.Structure):
@@ -151,12 +190,32 @@ def monitor(child: subprocess.Popen, output: Path, limits: Limits,
     return record
 
 
+def launch_guarded(command: list[str], output: Path, limits: Limits,
+                   lock_path: Path) -> dict:
+    with guarded_job_lock(lock_path):
+        before = sample_memory()
+        if violation(before, limits):
+            raise RuntimeError("Watchdog preflight rejected available memory")
+        (output / "child_memory.json").unlink(missing_ok=True)
+        environment = os.environ.copy()
+        environment.update(FISH_DRAMA3_WATCHDOG_ACTIVE="1",
+            FISH_DRAMA3_WATCHDOG_TELEMETRY=str((output / "child_memory.json").resolve()),
+            FISH_DRAMA3_WATCHDOG_GPU_GIB=str(limits.gpu_free_bytes / 2**30),
+            FISH_DRAMA3_WATCHDOG_RAM_GIB=str(limits.ram_free_bytes / 2**30),
+            FISH_DRAMA3_WATCHDOG_COMMIT_PERCENT=str(limits.commit_percent))
+        with (output / "child.log").open("a", encoding="utf-8") as log:
+            child = subprocess.Popen(command, env=environment, stdout=log, stderr=subprocess.STDOUT)
+            return monitor(child, output, limits)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--gpu-free-gib", type=float, default=1)
     parser.add_argument("--ram-free-gib", type=float, default=8)
     parser.add_argument("--commit-percent", type=float, default=90)
+    parser.add_argument("--lock-file", type=Path, default=DEFAULT_GPU_LOCK,
+                        help="Shared process lock; use the same path for all guarded GPU jobs")
     parser.add_argument("command", nargs=argparse.REMAINDER)
     args = parser.parse_args()
     command = args.command[1:] if args.command[:1] == ["--"] else args.command
@@ -169,19 +228,10 @@ def main() -> None:
         parser.error("Manual STOP switch already exists")
     limits = Limits(int(args.gpu_free_gib * 2**30), int(args.ram_free_gib * 2**30),
                     args.commit_percent)
-    before = sample_memory()
-    if violation(before, limits):
-        raise SystemExit("Watchdog preflight rejected available memory")
-    (args.output / "child_memory.json").unlink(missing_ok=True)
-    environment = os.environ.copy()
-    environment.update(FISH_DRAMA3_WATCHDOG_ACTIVE="1",
-                       FISH_DRAMA3_WATCHDOG_TELEMETRY=str((args.output / "child_memory.json").resolve()),
-                       FISH_DRAMA3_WATCHDOG_GPU_GIB=str(args.gpu_free_gib),
-                       FISH_DRAMA3_WATCHDOG_RAM_GIB=str(args.ram_free_gib),
-                       FISH_DRAMA3_WATCHDOG_COMMIT_PERCENT=str(args.commit_percent))
-    with (args.output / "child.log").open("a", encoding="utf-8") as log:
-        child = subprocess.Popen(command, env=environment, stdout=log, stderr=subprocess.STDOUT)
-        record = monitor(child, args.output, limits)
+    try:
+        record = launch_guarded(command, args.output, limits, args.lock_file)
+    except RuntimeError as error:
+        raise SystemExit(str(error)) from error
     print(json.dumps(record), flush=True)
     raise SystemExit(record["exit_code"] if record["state"] == "finished" else 125)
 

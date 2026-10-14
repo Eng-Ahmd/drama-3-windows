@@ -8,7 +8,58 @@ from pathlib import Path
 
 import pytest
 
-from fish_drama3.watchdog import Limits, merge_child_telemetry, monitor, sample_memory, save_status, violation
+from fish_drama3.watchdog import (
+    Limits, guarded_job_lock, merge_child_telemetry, monitor,
+    sample_memory, save_status, violation,
+)
+
+
+@pytest.mark.parametrize("terminate", [False, True])
+def test_guarded_job_lock_excludes_process_and_releases_on_exit(
+    tmp_path: Path, terminate: bool,
+) -> None:
+    lock = tmp_path / "shared-gpu.lock"
+    code = (
+        "from pathlib import Path; import sys; "
+        "from fish_drama3.watchdog import guarded_job_lock; "
+        "lease=guarded_job_lock(Path(sys.argv[1])); lease.__enter__(); "
+        "print('LOCKED',flush=True); sys.stdin.readline(); lease.__exit__(None,None,None)"
+    )
+    owner = subprocess.Popen([sys.executable, "-c", code, str(lock)],
+                             stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE, text=True)
+    try:
+        assert owner.stdout.readline().strip() == "LOCKED"
+        borrower = subprocess.run([sys.executable, "-c", code, str(lock)],
+                                  input="release\n", capture_output=True, text=True, timeout=5)
+        assert borrower.returncode != 0 and "Another guarded GPU job" in borrower.stderr
+        assert "No child was launched" in borrower.stderr
+        if terminate:
+            owner.terminate()
+            owner.wait(timeout=5)
+        else:
+            owner.communicate("release\n", timeout=5)
+            assert owner.returncode == 0
+        with guarded_job_lock(lock):
+            assert lock.is_file()
+    finally:
+        if owner.poll() is None:
+            owner.kill()
+            owner.wait(timeout=5)
+
+
+def test_busy_guarded_launch_does_not_sample_or_spawn(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    import fish_drama3.watchdog as watchdog
+    lock = tmp_path / "shared-gpu.lock"
+    monkeypatch.setattr(watchdog, "sample_memory",
+                        lambda: pytest.fail("Sampled before acquiring lock"))
+    monkeypatch.setattr(watchdog.subprocess, "Popen",
+                        lambda *a, **kw: pytest.fail("Launched overlapping child"))
+    with guarded_job_lock(lock):
+        with pytest.raises(RuntimeError, match="Another guarded GPU job"):
+            watchdog.launch_guarded([sys.executable, "-c", "pass"], tmp_path, Limits(), lock)
 
 
 def test_status_publish_recovers_transient_windows_reader_lock(tmp_path: Path, monkeypatch) -> None:

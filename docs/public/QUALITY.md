@@ -21,6 +21,11 @@ it is not a standalone native model graph.
 
 ## Guarded execution
 
+The watchdog holds a shared workspace process lock before launching a GPU job.
+Another guarded launcher fails without starting its child until that lock is
+released. The operating system releases the lock when its owner exits. Keep the
+same default lock path for all jobs; unwrapped processes are outside this guard.
+
 Run the qualification process through the external watchdog. It records the
 actual GPU-free-memory, host-free-memory and system-commit thresholds supplied
 by the parent environment. Current ordinary profile: twelve GPU expert layers;
@@ -89,6 +94,20 @@ generated audio using Faster Whisper 1.2.1, CTranslate2 4.8.3 and the frozen
 aggregate quality result. The frozen case failed: it reached its 384-frame limit without EOS, and ASR recognized only the first sentence. A finite waveform does not make the request complete. A separate guarded CLI run reached EOS at frame 169 and produced 7.848 seconds of audio in 39 seconds. ASR recognized the requested words but inserted “Haha” (WER 0.0714). This single-run observation is not an aggregate quality or speed result. The controlled Q4-in-PyTorch-BF16 comparison was stopped by the watchdog at frame 160 and is incomplete; it supports no causal conclusion.
 
 ## Remaining release gates
+
+A supplemental guarded run completed names, expressive tags, canonical speaker
+tags, English and Chinese voice references, a longer passage, three invalid
+inputs, and an identical seeded replay after those requests. All valid requests
+reached EOS and the repeated request produced identical acoustic codes. This
+supplement excludes the previously recorded numbers failure and does not count
+as a pass of the full corpus.
+
+Frozen English ASR returned zero WER for the names, tags, speakers and English
+clone examples. The longer passage contained all three sentences; its 2.44% WER
+was one numeric transcription difference (`twenty` versus `20`). Waveform analysis
+also found an 8.14-second near-silent interval in that 21.69-second clip, using
+20 ms windows below RMS 1e-4 full scale. This remains an acoustic issue under
+investigation. Chinese CER has not been measured with a suitable evaluator.
 
 Full-model FP8 reference execution currently requires a suitable 48 GB runner.
 That source-baseline gate is unavailable locally and is explicitly recorded.
