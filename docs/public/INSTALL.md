@@ -9,7 +9,7 @@ This guide installs or builds the Windows release `0.1.0` on Windows 11. The cur
   libraries target SM120; other GPU architectures require a compatible source build.
 - Visual Studio 2022 C++ build tools, CMake, and Ninja are required only when compiling the runtime from source.
 - For CUDA builds, an NVIDIA driver and CUDA Toolkit 13.3. The observed target was an RTX 5080 Laptop GPU with 16 GiB of VRAM.
-- The pinned Drama 3 checkpoint files from Hugging Face, accessed under the model's license. A Hugging Face repository is planned for the converted model and codec bundles; until it is published, create them locally with the conversion steps below. This source repository does not bundle weights.
+- The converted [model and codec bundles](https://huggingface.co/Eng-Ahmd/Drama-3-Windows-GGUF), accessed under the applicable licenses. The original pinned checkpoint is needed only for local conversion. This source repository does not bundle weights.
 - Enough local disk for the source checkpoint, model and codec bundles, and build outputs. A complete converted model bundle is about 21.67 GiB and the codec about 1.46 GiB.
 
 ## Use the prebuilt Windows runtime
@@ -25,7 +25,7 @@ Create and activate a virtual environment in PowerShell, then install the CUDA-e
 
 ```powershell
 py -3.13 -m venv .venv
-\.venv\Scripts\Activate.ps1
+.\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
 python -m pip install --index-url https://download.pytorch.org/whl/cu132 torch==2.13.0+cu132
 python -m pip install -r requirements-runtime.txt
@@ -57,6 +57,23 @@ The recorded pins are:
 - Fish Speech reference: `1ff3c3ed2f80d3106a83909dd25b83129c3d816f`
 - s2.cpp: `2c33261938da1a41d713768b1b391b4d368d7d2c`
 - GGML: `57ea0bc119d722d74594196cc5b494a34dd87be4`
+
+## Download the converted model and codec
+
+The [Hugging Face bundle](https://huggingface.co/Eng-Ahmd/Drama-3-Windows-GGUF)
+contains ready-to-use model and codec files with their verification manifests.
+Install the download client and fetch each bundle into the directories used below:
+
+```powershell
+python -m pip install "huggingface_hub>=1.0,<2"
+python -c "from huggingface_hub import snapshot_download; snapshot_download('Eng-Ahmd/Drama-3-Windows-GGUF', local_dir='models/drama3-windows', allow_patterns=['model/*', 'codec/*', 'LICENSE', 'LICENSES/*', 'NOTICE.md'])"
+fish-drama3 synth --bundle models/drama3-windows/model --codec models/drama3-windows/codec/codec.gguf --text "Hello. This is local speech synthesis." --output outputs/hello.wav --gpu-expert-layers 12
+```
+
+This download needs about 23.13 GiB for the model and codec. Bootstrap, Python
+and native libraries are still required; converting the original checkpoint is
+optional when using these bundles. The CLI verifies each complete file against
+its manifest before loading it.
 
 ## Convert a local checkpoint
 

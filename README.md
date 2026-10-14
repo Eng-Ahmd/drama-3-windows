@@ -2,7 +2,7 @@
 
 This repository contains the **Windows release 0.1.0** for running Fish Audio Drama 3 on Windows. It combines a PyTorch model path with native GGML expert execution and a native audio codec. It is a hybrid Windows runtime, not a standalone C++ model engine.
 
-The project includes a direct converter for the pinned Drama 3 checkpoint, an offline synthesis CLI, native CPU and CUDA components, and guarded evaluation tools. Model weights and compiled binaries are separate from this source tree. A Hugging Face repository is planned for the converted bundle and codec; until it is published, use the local conversion steps in the installation guide. Obtain model files under their applicable license terms and install the [prebuilt Windows libraries](https://github.com/Eng-Ahmd/drama-3-windows/releases) or build them locally. Source code is hosted at the [GitHub repository](https://github.com/Eng-Ahmd/drama-3-windows).
+The project includes a direct converter for the pinned Drama 3 checkpoint, an offline synthesis CLI, native CPU and CUDA components, and guarded evaluation tools. Model weights and compiled binaries are separate from this source tree. Download the converted model and codec from [Hugging Face](https://huggingface.co/Eng-Ahmd/Drama-3-Windows-GGUF), then follow the installation guide. Local conversion from the pinned checkpoint is also supported. Obtain model files under their applicable license terms and install the [prebuilt Windows libraries](https://github.com/Eng-Ahmd/drama-3-windows/releases) or build them locally. Source code is hosted at the [GitHub repository](https://github.com/Eng-Ahmd/drama-3-windows).
 
 ## Start here
 
@@ -24,7 +24,7 @@ The native codec reproduced all 850 reference acoustic codes in the checked exam
 
 Long inputs use bounded text segments with the pinned model's audio-history conditioning. On the checked three-sentence passage, this completed all text in 14.12 seconds of audio and removed the unchunked run's long silent interval. Four short English checks had zero ASR WER; the checked Chinese plain example had zero CER. These are individual checks, with settings and limitations recorded in the [quality report](docs/public/QUALITY.md).
 
-Generation is stochastic: the recorded numbers prompt stalled at seed 124, while the default seed 123 completed both sentences. Frame limits fail without publishing incomplete audio unless explicitly requested. Larger acoustic holdouts, cancellation recovery, clean-machine installation and long-session qualification remain documented work.
+Generation is stochastic: the recorded numbers prompt stalled at seed 124, while the default seed 123 completed both sentences. Frame limits fail without publishing incomplete audio unless explicitly requested. A guarded two-hour repeated-request soak passed with 713 successful speech requests and 143 validation recovery cycles. Larger acoustic holdouts, cancellation recovery, clean-machine installation and varied-content coverage remain documented work.
 
 ## Licensing
 
