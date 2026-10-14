@@ -93,9 +93,9 @@ The first matched English example produced zero WER for both official and
 generated audio using Faster Whisper 1.2.1, CTranslate2 4.8.3 and the frozen
 `Systran/faster-whisper-base.en` revision
 `3d3d5dee26484f91867d81cb899cfcf72b96be6c`. This is one example, not an
-aggregate quality result. The frozen case failed: it reached its 384-frame limit without EOS, and ASR recognized only the first sentence. A finite waveform does not make the request complete. A separate guarded CLI run reached EOS at frame 169 and produced 7.848 seconds of audio in 39 seconds. ASR recognized the requested words but inserted “Haha” (WER 0.0714). This single-run observation is not an aggregate quality or speed result. The controlled Q4-in-PyTorch-BF16 comparison was stopped by the watchdog at frame 160 and is incomplete; it supports no causal conclusion.
+aggregate quality result. The frozen case failed: it reached its 384-frame limit without EOS, and ASR recognized only the first sentence. A finite waveform does not make the request complete. A separate guarded CLI run reached EOS at frame 169 and produced 7.848 seconds of audio in 39 seconds. ASR recognized the requested words but inserted “Haha” (WER 0.0714). This single-run observation is not an aggregate quality or speed result. Completed controlled source-history comparisons are described below.
 
-## Remaining release gates
+## Evaluation scope and known behavior
 
 Runtime 0.1.0 adds bounded paragraph generation with audio-history conditioning.
 The previously stalled three-sentence passage completed at seed 123 in two
@@ -125,8 +125,8 @@ Frozen English ASR returned zero WER for the names, tags, speakers and English
 clone examples. The longer passage contained all three sentences; its 2.44% WER
 was one numeric transcription difference (`twenty` versus `20`). Waveform analysis
 also found an 8.14-second near-silent interval in that 21.69-second clip, using
-20 ms windows below RMS 1e-4 full scale. This remains an acoustic issue under
-investigation. Chinese CER has not been measured with a suitable evaluator.
+20 ms windows below RMS 1e-4 full scale. Unsegmented generation can still exhibit this issue; the bounded-generation
+regression is listed above. The English-only evaluator was not used for Chinese.
 
 A separate teacher-forced comparison used the same 128-frame successful source
 history with reconstructed source BF16 experts, native CPU Q4 experts, and Q4
