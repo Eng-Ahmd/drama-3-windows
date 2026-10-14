@@ -27,6 +27,7 @@ ALIGN = 32
 T_STRING, T_UINT32, T_BOOL = 8, 4, 7
 T_INT32, T_FLOAT32, T_ARRAY = 5, 6, 9
 GGML_F32 = 0
+MAX_RESOURCE_BYTES = 64_000_000
 
 
 def _pack_str(b: bytearray, s: str) -> None:
@@ -51,6 +52,24 @@ class StreamingGGUFWriter:
         if self._handle is not None or any(k == key for k, _, _ in self.kv):
             raise ValueError(f"Late or duplicate metadata: {key}")
         self.kv.append((key, vtype, value))
+
+    def add_resource(self, key: str, value: str, max_bytes: int = 8_000_000) -> None:
+        """Keep each UTF-8 metadata string below the Hub parser's 10 MB limit."""
+        if not 4 <= max_bytes <= 8_000_000:
+            raise ValueError("Resource string limit must be 4..8000000 bytes")
+        size = len(value.encode("utf-8"))
+        if size > MAX_RESOURCE_BYTES:
+            raise ValueError("Resource exceeds 64 MB")
+        if size <= max_bytes:
+            self.add_kv(key, T_STRING, value)
+            return
+        width = max_bytes // 4
+        chunks = [value[start:start + width] for start in range(0, len(value), width)]
+        if len(chunks) > 64:
+            raise ValueError("Too many resource chunks")
+        self.add_kv(key + ".chunk_count", T_UINT32, len(chunks))
+        for index, chunk in enumerate(chunks):
+            self.add_kv(f"{key}.chunk.{index:04d}", T_STRING, chunk)
 
     def add_tensor(self, name: str, logical_shape: list[int], ggml_type: int,
                    nbytes: int, src_path: Path, src_offset: int = 0) -> None:
@@ -184,3 +203,34 @@ class StreamingGGUFWriter:
         for t in self.tensors:
             self.stream_one(t["name"], chunk)
         return self.finish()
+
+
+def read_resource_text(fields: dict, key: str) -> str:
+    """Read legacy or chunked resource metadata without changing its content."""
+    counter = key + ".chunk_count"
+    if key in fields:
+        if counter in fields:
+            raise ValueError("Ambiguous resource encoding")
+        value = fields[key].contents()
+        if not isinstance(value, str):
+            raise ValueError("Resource must be text")
+        return value
+    if counter not in fields:
+        raise ValueError(f"Missing resource: {key}")
+    count = fields[counter].contents()
+    if not isinstance(count, int) or not 1 <= count <= 64:
+        raise ValueError("Invalid resource chunk count")
+    chunks = []
+    total = 0
+    for index in range(count):
+        field = fields.get(f"{key}.chunk.{index:04d}")
+        if field is None:
+            raise ValueError("Missing resource chunk")
+        value = field.contents()
+        if not isinstance(value, str):
+            raise ValueError("Resource chunk must be text")
+        total += len(value.encode("utf-8"))
+        if total > MAX_RESOURCE_BYTES:
+            raise ValueError("Resource exceeds 64 MB")
+        chunks.append(value)
+    return "".join(chunks)

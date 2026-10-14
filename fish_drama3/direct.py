@@ -221,7 +221,7 @@ def configure_writer(path: Path, checkpoint: Path, plans: list[TensorPlan], comp
     writer.add_kv("fish_drama3.revision", T_STRING, REVISION)
     writer.add_kv("fish_drama3.complete", T_BOOL, complete)
     for name in ("config.json", "tokenizer.json", "tokenizer_config.json", "special_tokens_map.json"):
-        writer.add_kv(f"fish_drama3.resource.{name}", T_STRING,
+        writer.add_resource(f"fish_drama3.resource.{name}",
                       (checkpoint / name).read_text(encoding="utf-8"))
     for plan in plans:
         writer.add_tensor(plan.name, list(plan.shape), plan.storage, plan.nbytes, Path("."))

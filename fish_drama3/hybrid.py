@@ -16,6 +16,7 @@ import numpy as np
 import torch
 from gguf import GGUFReader, GGMLQuantizationType, dequantize
 from tokenizers import Tokenizer
+from fish_drama3.gguf_stream import read_resource_text
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "upstream/fish-speech"))
@@ -119,9 +120,9 @@ def load_model(bundle: Path, device: str = "cuda:0", threads: int = 8, gpu_layer
     if not manifest.get("complete") or manifest.get("recipe") != "Q4_K-experts_Q8_0-backbone":
         raise ValueError("A complete direct Q4_K/Q8_0 bundle is required")
     reader = GGUFReader(str(bundle / "model.gguf"))
-    config = FishOmniConfig.from_dict(json.loads(reader.fields[
-        "fish_drama3.resource.config.json"].contents()))
-    tokenizer = Tokenizer.from_str(reader.fields["fish_drama3.resource.tokenizer.json"].contents())
+    config = FishOmniConfig.from_dict(json.loads(read_resource_text(reader.fields,
+        "fish_drama3.resource.config.json")))
+    tokenizer = Tokenizer.from_str(read_resource_text(reader.fields, "fish_drama3.resource.tokenizer.json"))
     if gpu_layers and device != "cuda:0":
         raise ValueError("CUDA expert placement supports cuda:0 only")
     if gpu_layers:

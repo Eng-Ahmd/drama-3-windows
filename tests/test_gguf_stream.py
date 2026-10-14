@@ -6,7 +6,7 @@ import gguf
 import numpy as np
 import pytest
 
-from fish_drama3.gguf_stream import StreamingGGUFWriter
+from fish_drama3.gguf_stream import StreamingGGUFWriter, read_resource_text
 from fish_drama3.native_quant import Q4_K, quantize
 
 
@@ -93,3 +93,39 @@ def test_short_source_file_fails(tmp_path: Path) -> None:
     with pytest.raises(EOFError, match="Short"):
         writer.stream_one("weight", chunk=2)
     writer.abort()
+
+
+@pytest.mark.parametrize("text", ["short", '{"text":"你好🦊 العربية"}' * 8], ids=["legacy", "chunked-unicode"])
+def test_resource_text_preserves_unicode_and_legacy_encoding(tmp_path: Path, text: str) -> None:
+    path = tmp_path / "resources.gguf"
+    writer = StreamingGGUFWriter(path)
+    writer.add_resource("resource", text, max_bytes=24)
+    writer.begin()
+    writer.finish()
+    reader = gguf.GGUFReader(str(path))
+    assert read_resource_text(reader.fields, "resource") == text
+    for key, field in reader.fields.items():
+        if key.startswith("resource.chunk."):
+            assert len(field.contents().encode("utf-8")) <= 24
+    if len(text.encode("utf-8")) <= 24:
+        assert "resource" in reader.fields
+    else:
+        fields = dict(reader.fields)
+        fields.pop("resource.chunk.0001")
+        with pytest.raises(ValueError, match="Missing resource chunk"):
+            read_resource_text(fields, "resource")
+        fields = dict(reader.fields)
+        fields["resource"] = reader.fields["resource.chunk.0000"]
+        with pytest.raises(ValueError, match="Ambiguous"):
+            read_resource_text(fields, "resource")
+
+
+def test_resource_writer_rejects_oversize_before_emitting(tmp_path: Path, monkeypatch) -> None:
+    import fish_drama3.gguf_stream as stream
+
+    monkeypatch.setattr(stream, "MAX_RESOURCE_BYTES", 32)
+    writer = StreamingGGUFWriter(tmp_path / "resource.gguf")
+    previous = list(writer.kv)
+    with pytest.raises(ValueError, match="exceeds"):
+        writer.add_resource("resource", "🦊" * 9, max_bytes=16)
+    assert writer.kv == previous

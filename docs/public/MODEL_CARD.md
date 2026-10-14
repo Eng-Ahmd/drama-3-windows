@@ -12,7 +12,7 @@ tags:
   - windows
 ---
 
-# Fish Audio Drama 3 Windows runtime — 0.1.0
+# Fish Audio Drama 3 — 35.9B — Windows runtime 0.1.1
 
 This repository provides the Drama 3 Q4_K expert / Q8_0 backbone model and separate native-codec bundle for the [Windows runtime](https://github.com/Eng-Ahmd/drama-3-windows). Built with Fish Audio. The pinned upstream checkpoint is [Fish Audio Drama 3](https://huggingface.co/fishaudio/drama-3/tree/dd64a85cd82e9521f7202610ede97b367fc83946).
 
@@ -22,7 +22,7 @@ Download `model/model.gguf` with `model/manifest.json`, and `codec/codec.gguf` w
 
 The speech model contains **35,899,643,008 parameters (35.9B total)**, matching the original checkpoint tensor count. Quantization changes storage precision, not the parameter count. The separate codec has 392,971,249 stored tensor elements (approximately 0.393B); it is not the speech model.
 
-`Drama-3-35.9B-Q4_K-Q8_0.gguf` is the root-level main-model alias for Hub indexing. It has the same SHA-256 and bytes as `model/model.gguf`. Download either copy of the model, not both; the existing installation commands use `model/model.gguf`.
+`Drama-3-35.9B-Q4_K-Q8_0.gguf` is the root-level main-model alias for Hub indexing. It has the same SHA-256 and bytes as `model/model.gguf`. These files require runtime 0.1.1 or newer; upgrade the source if you installed 0.1.0. Older single-string model files remain loadable by 0.1.1. Download either copy of the model, not both; the existing installation commands use `model/model.gguf`.
 
 The converted model bundle is approximately 21.67 GiB, with a separate V3 codec bundle of approximately 1.46 GiB. These bundle sizes are provided to plan local conversion and storage; the weights are not part of the source-code repository.
 
@@ -34,7 +34,7 @@ The source checkpoint combines FP8 and BF16 tensors. The converter streams it in
 - Audio tower matrices: BF16. Codec learned weights: F32, with original BF16 RoPE tables.
 - GGUF custom architecture: `fish_drama3`, requiring this repository's matching runtime rather than generic llama.cpp support.
 
-The converted model contains 925 tensors and 23,270,209,984 bytes (about 21.67 GiB). The separate V3 codec bundle contains 458 tensors and 1,568,779,744 bytes (about 1.46 GiB). The manifests include complete file and tensor hashes for verification.
+The converted model contains 925 tensors and 23,270,210,720 bytes (about 21.67 GiB). The separate V3 codec bundle contains 458 tensors and 1,568,779,744 bytes (about 1.46 GiB). The manifests include complete file and tensor hashes for verification. Runtime 0.1.1 splits the embedded tokenizer JSON into UTF-8 metadata chunks below the Hub parser limit. All 925 tensor payload hashes and the complete tokenizer text match the initial release exactly; only the file header and whole-file hash change.
 
 ### Runtime compatibility
 
