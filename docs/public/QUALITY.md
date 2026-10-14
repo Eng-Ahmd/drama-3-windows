@@ -111,6 +111,26 @@ also found an 8.14-second near-silent interval in that 21.69-second clip, using
 20 ms windows below RMS 1e-4 full scale. This remains an acoustic issue under
 investigation. Chinese CER has not been measured with a suitable evaluator.
 
+A separate teacher-forced comparison used the same 128-frame successful source
+history with reconstructed source BF16 experts, native CPU Q4 experts, and Q4
+weights evaluated through the pinned BF16 Torch expert arithmetic. Both Q4 paths
+matched the source's top-ranked semantic token at the four measured endpoints.
+At the final endpoint EOS ranked first in all three paths, with probabilities
+0.3258, 0.3555 and 0.3361 respectively. Final-layer residual relative RMS drift
+was 1.80% for native Q4 and 1.88% for Torch Q4 against that source control.
+This comparison uses chunked recurrent execution and a shared Q8 backbone; it
+does not establish original FP8 equivalence or waveform quality. It does not
+identify an intrinsic EOS-kernel defect; generated-history and sampling
+divergence remain under investigation.
+
+The previously failing numbers prompt was also run with the CLI's default seed
+123. It reached EOS at frame 179, produced 8.31 seconds of audio, and the frozen
+ASR evaluator recognized both complete sentences. Literal WER was 47.06% because
+the evaluator wrote `9.30`, `25` and `1234` instead of their spelled-out forms;
+the frozen normalizer has not been altered to hide those substitutions. The
+seed-124 failure remains recorded. If a request reaches its frame limit, use
+another seed and verify the complete result rather than accepting partial audio.
+
 Full-model FP8 reference execution currently requires a suitable 48 GB runner.
 That source-baseline gate is unavailable locally and is explicitly recorded.
 Production qualification also requires the larger frozen corpus, acoustic
