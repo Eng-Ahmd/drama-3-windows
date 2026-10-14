@@ -1,7 +1,7 @@
 """Check completed audio publication and bounded reference preprocessing."""
 import json
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import MagicMock, Mock
 from pathlib import Path
 
 import numpy as np
@@ -80,3 +80,50 @@ def test_reference_rejects_oversized_header_before_read(tmp_path: Path) -> None:
     sf.write(path, np.zeros((1, 9), dtype=np.float32), 44100, subtype="FLOAT")
     with pytest.raises(ValueError, match="channels"):
         reference_audio(path)
+
+
+@pytest.mark.parametrize("allow_partial", [False, True])
+def test_synthesis_partial_output_contract(tmp_path: Path, monkeypatch, allow_partial: bool) -> None:
+    """A length-limited result must not silently become completed audio."""
+    import sys
+    import fish_drama3.cli as cli
+
+    path = tmp_path / "partial.wav"
+    args = SimpleNamespace(output=path, text="First. Second.", reference_text=None,
+        reference_audio=None, bundle=tmp_path, codec=tmp_path / "codec.gguf",
+        threads=1, seed=123, gpu_expert_layers=0, allow_partial=allow_partial,
+        temperature=0.7, top_p=0.7, top_k=30, chunk_length=200)
+    segment = dict(text="First.", frames=1, finish_reason="length")
+    frames = MagicMock()
+    frames.__len__.return_value = 1
+    frames.numpy.return_value = np.zeros((1, 11), dtype=np.int64)
+    codec, bridge = Mock(), Mock()
+    codec.decode.return_value = np.linspace(-0.1, 0.1, 2048, dtype=np.float32)
+    context = MagicMock()
+    context.__enter__.return_value = codec
+    monkeypatch.setattr(cli, "CodecBridge", Mock(return_value=context))
+    monkeypatch.setattr(cli, "verify_assets", Mock(return_value={"verified": True}))
+    monkeypatch.setitem(sys.modules, "torch", SimpleNamespace(set_num_threads=Mock(),
+        manual_seed=Mock(), cuda=SimpleNamespace(max_memory_allocated=Mock(return_value=0))))
+    monkeypatch.setitem(sys.modules, "fish_drama3.hybrid", SimpleNamespace(
+        load_model=Mock(return_value=(Mock(), bridge))))
+    monkeypatch.setitem(sys.modules, "fish_drama3.generation", SimpleNamespace(
+        validate_drama3_text=Mock(), generate_text=Mock(return_value=(frames, "length", [segment]))))
+    with output_claim(path):
+        if allow_partial:
+            result = cli.synthesize(args)
+            report = json.loads(path.with_suffix(".json").read_text(encoding="utf-8"))
+            assert result["complete"] is False and report["complete"] is False
+            assert report["finish_reason"] == "length" and report["segments"] == [segment]
+            values, rate = sf.read(path)
+            assert values.shape == (2048,) and rate == 44100
+        else:
+            with pytest.raises(RuntimeError, match="no complete WAV published"):
+                cli.synthesize(args)
+            codec.decode.assert_not_called()
+    bridge.close.assert_called_once()
+    context.__exit__.assert_called_once()
+    assert not path.with_suffix(".lock").exists()
+    assert not list(tmp_path.glob("*.partial"))
+    if not allow_partial:
+        assert not path.exists() and not path.with_suffix(".json").exists()
