@@ -20,6 +20,10 @@ Download `model/model.gguf` with `model/manifest.json`, and `codec/codec.gguf` w
 
 ## Model and runtime
 
+The speech model contains **35,899,643,008 parameters (35.9B total)**, matching the original checkpoint tensor count. Quantization changes storage precision, not the parameter count. The separate codec has 392,971,249 stored tensor elements (approximately 0.393B); it is not the speech model.
+
+`Drama-3-35.9B-Q4_K-Q8_0.gguf` is the root-level main-model alias for Hub indexing. It has the same SHA-256 and bytes as `model/model.gguf`. Download either copy of the model, not both; the existing installation commands use `model/model.gguf`.
+
 The converted model bundle is approximately 21.67 GiB, with a separate V3 codec bundle of approximately 1.46 GiB. These bundle sizes are provided to plan local conversion and storage; the weights are not part of the source-code repository.
 
 The source checkpoint combines FP8 and BF16 tensors. The converter streams it into a custom `fish_drama3` GGUF model bundle using this recipe:

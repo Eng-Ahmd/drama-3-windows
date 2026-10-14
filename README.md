@@ -16,6 +16,8 @@ The project includes a direct converter for the pinned Drama 3 checkpoint, an of
 
 The inference path keeps the backbone and audio tower in PyTorch, runs routed experts through native GGML CPU/CUDA libraries, and uses the native codec to encode reference audio and decode generated acoustic codes. The converter emits a custom `fish_drama3` GGUF architecture. It requires this matching runtime; generic llama.cpp does not provide Drama 3 support.
 
+The speech model has 35.9B total parameters, matching the pinned upstream checkpoint. The separate codec is approximately 0.393B stored tensor elements. Quantization reduces storage precision, not parameter count.
+
 The conversion recipe stores expert weights as Q4_K, the backbone as Q8_0, sensitive vectors as F32, and the audio tower in BF16 and the learned codec weights in F32, preserving the codec RoPE tables in BF16. A complete model bundle is about 21.67 GiB and its codec is about 1.46 GiB. Conversion is direct from the pinned FP8/BF16 source without a full FP32 model intermediate.
 
 ## Current evidence and limits
