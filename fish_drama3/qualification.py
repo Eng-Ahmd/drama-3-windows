@@ -133,12 +133,16 @@ def source_identity(options: argparse.Namespace) -> dict:
     binaries = list((ROOT / "builds" / build / "Release").glob("*.dll"))
     binaries += list((ROOT / "builds/drama3-inspect/Release").glob("*.dll"))
     return dict(bundle_manifest_sha256=sha_file(options.bundle / "manifest.json"),
+                schema="fish-drama3-qualification-v2-chunked",
                 declared_model_sha256=manifest.get("model_sha256"),
                 codec_manifest_sha256=sha_file(options.codec.parent / "manifest.json"),
                 declared_codec_sha256=codec_manifest.get("sha256"),
                 corpus_sha256=sha_file(options.corpus),
                 runner_sha256=sha_file(Path(__file__)),
                 hybrid_source_sha256=sha_file(ROOT / "fish_drama3/hybrid.py"),
+                generation_source_sha256=sha_file(ROOT / "fish_drama3/generation.py"),
+                text_chunks_source_sha256=sha_file(ROOT / "fish_drama3/text_chunks.py"),
+                chunk_length=options.chunk_length,
                 native_hashes={str(path.relative_to(ROOT)): sha_file(path) for path in binaries},
                 reference_codes_sha256=sha_file(ROOT / "models/comparison/en0-codes.npy"),
                 reference_transcript=REF_TEXT,
@@ -180,21 +184,47 @@ def initialize_run(options: argparse.Namespace) -> tuple[dict, list[dict]]:
     return manifest, events
 
 
+def case_references(case: dict) -> tuple[list[str], list[torch.Tensor]]:
+    if not case.get("reference"):
+        return [], []
+    if case["reference"] != "en0":
+        raise ValueError("Unknown frozen reference identity")
+    codes = np.load(ROOT / "models/comparison/en0-codes.npy", allow_pickle=False)
+    if (codes.ndim != 2 or codes.shape[0] != 10 or not codes.shape[1]
+            or not np.issubdtype(codes.dtype, np.integer)):
+        raise ValueError("Reference codes must be integer [10, frames]")
+    if np.any(codes < 0) or np.any(codes[0] >= 4096) or np.any(codes[1:] >= 1024):
+        raise ValueError("Reference codes exceed semantic/residual vocabulary")
+    return [REF_TEXT], [torch.from_numpy(codes.astype(np.int64))]
+
+
 def case_prompt(case: dict, model):
     from fish_drama3.hybrid import build_drama3_prompt
 
+    texts, codes = case_references(case)
     text = case["text"] * case.get("text_repeat", 1)
-    if case.get("reference"):
-        path = ROOT / "models/comparison/en0-codes.npy"
-        codes = np.load(path, allow_pickle=False)
-        return build_drama3_prompt(text, model.tokenizer, model.config,
-                                  [REF_TEXT], [torch.from_numpy(codes.astype(np.int64))])
-    return build_drama3_prompt(text, model.tokenizer, model.config)
+    return build_drama3_prompt(text, model.tokenizer, model.config, texts, codes)
 
 
-def execute_case(case: dict, model, codec: CodecBridge) -> tuple[dict, np.ndarray | None, np.ndarray | None]:
-    from fish_drama3.hybrid import generate_drama3
+def case_generation(case: dict, model, chunk_length: int):
+    from fish_drama3.generation import generate_text
+    from fish_drama3.text_chunks import split_text
 
+    text = case["text"] * case.get("text_repeat", 1)
+    texts, codes = case_references(case)
+    args = argparse.Namespace(text=text, chunk_length=chunk_length,
+                              max_frames=case["max_frames"], temperature=0.7, top_p=0.7, top_k=30)
+    expected_segments = len(split_text(text, chunk_length)) if chunk_length else 1
+    frames, reason, segments = generate_text(model, args, texts, codes)
+    complete = (reason == "eos" and len(segments) == expected_segments
+                and all(segment["finish_reason"] == "eos" for segment in segments)
+                and sum(segment["frames"] for segment in segments) == len(frames)
+                and 0 < len(frames) <= case["max_frames"])
+    return frames, reason, segments, complete
+
+
+def execute_case(case: dict, model, codec: CodecBridge, chunk_length: int = 200
+                 ) -> tuple[dict, np.ndarray | None, np.ndarray | None]:
     torch.manual_seed(case["seed"])
     started = time.perf_counter()
     try:
@@ -210,8 +240,7 @@ def execute_case(case: dict, model, codec: CodecBridge) -> tuple[dict, np.ndarra
         return dict(passed=False, rejected=False, error="Expected invalid request accepted"), None, None
     prompt_seconds = time.perf_counter() - started
     started = time.perf_counter()
-    frames, reason = generate_drama3(model, prompt, max_new_tokens=case["max_frames"],
-                                     temperature=0.7, top_p=0.7, top_k=30)
+    frames, reason, segments, complete = case_generation(case, model, chunk_length)
     rows = frames.numpy()
     generation_seconds = time.perf_counter() - started
     prepare_codes(rows)
@@ -220,7 +249,9 @@ def execute_case(case: dict, model, codec: CodecBridge) -> tuple[dict, np.ndarra
     codec_seconds = time.perf_counter() - started
     if not np.isfinite(audio).all():
         raise ValueError("Nonfinite waveform")
-    return dict(passed=reason == "eos", rejected=False, finish_reason=reason,
+    return dict(passed=complete, complete=complete, rejected=False, finish_reason=reason,
+                text_segments=segments, chunk_length=chunk_length,
+                frame_budget=case["max_frames"],
                 frames=len(rows), samples=len(audio), prompt_rows=len(prompt),
                 prompt_seconds=prompt_seconds, generation_seconds=generation_seconds,
                 codec_seconds=codec_seconds, codes_sha256=hashlib.sha256(rows.tobytes()).hexdigest(),
@@ -234,7 +265,7 @@ def record_request(index: int, case: dict, options, model, codec, hashes: dict) 
     append_event(options.output / "requests.jsonl", {**record, "event": "started"})
     rows = audio = None
     try:
-        outcome, rows, audio = execute_case(case, model, codec)
+        outcome, rows, audio = execute_case(case, model, codec, options.chunk_length)
         record.update(outcome)
         key = case["id"] + ":" + str(case["seed"])
         if rows is not None:
@@ -353,6 +384,8 @@ def parse_options() -> argparse.Namespace:
     parser.add_argument("--soak-seconds", type=int, default=7200)
     parser.add_argument("--min-requests", type=int, default=200)
     parser.add_argument("--failure-cycles", type=int, default=50)
+    parser.add_argument("--chunk-length", type=int, default=200,
+                        help="32..2000 characters per chunk; 0 uses the legacy unchunked control")
     parser.add_argument("--asr-model", type=Path)
     parser.add_argument("--asr-audio", type=Path, nargs="+")
     parser.add_argument("--asr-transcript")
@@ -361,6 +394,8 @@ def parse_options() -> argparse.Namespace:
         parser.error("QA accepts only 0..12 GPU expert layers and 1..256 threads")
     if min(options.soak_seconds, options.min_requests, options.failure_cycles) < 0:
         parser.error("Soak settings must be nonnegative")
+    if options.chunk_length != 0 and not 32 <= options.chunk_length <= 2000:
+        parser.error("Chunk length must be 0 or 32..2000")
     return options
 
 
