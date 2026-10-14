@@ -1,7 +1,6 @@
-"""Windows prototype: GGML Q4 CPU experts with the pinned Fish GPU reference.
+"""Hybrid Windows inference with native GGML experts and the pinned Fish model.
 
-This is an inference development path, not the standalone C++ release.
-Generation returns acoustic codes; waveform decoding is handled separately.
+Generation returns acoustic codes for waveform decoding through the native codec.
 """
 from __future__ import annotations
 
@@ -124,7 +123,7 @@ def load_model(bundle: Path, device: str = "cuda:0", threads: int = 8, gpu_layer
         "fish_drama3.resource.config.json"].contents()))
     tokenizer = Tokenizer.from_str(reader.fields["fish_drama3.resource.tokenizer.json"].contents())
     if gpu_layers and device != "cuda:0":
-        raise ValueError("CUDA expert prototype currently supports cuda:0 only")
+        raise ValueError("CUDA expert placement supports cuda:0 only")
     if gpu_layers:
         check_gpu_budget(reader, gpu_layers)
     bridge = ExpertBridge(bundle / "model.gguf", threads, gpu_layers)
