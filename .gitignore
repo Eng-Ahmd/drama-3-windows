@@ -1,0 +1,17 @@
+/upstream/
+/builds/
+/models/
+/checkpoints/
+/outputs/
+/artifacts/
+/.hf-cache/
+/.venv/
+/.pytest-tmp/
+/.pytest_cache/
+__pycache__/
+*.egg-info/
+*.gguf
+*.safetensors
+*.pth
+*.wav
+*.npy
