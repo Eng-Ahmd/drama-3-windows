@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fish-drama3-native"
+version = "0.1.0rc1"
+description = "Hybrid Windows inference and conversion tools using PyTorch and native GGML"
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+license = { file = "LICENSE" }
+dependencies = [
+  "numpy==2.2.6",
+  "safetensors==0.6.2",
+  "gguf==0.18.0",
+  "tokenizers==0.22.1",
+  "soundfile==0.13.1",
+  "psutil==7.0.0",
+  "scipy==1.18.1",
+  "loguru==0.7.3",
+  "tqdm==4.67.1",
+]
+
+[project.scripts]
+fish-drama3 = "fish_drama3.cli:main"
+fish-drama3-convert = "fish_drama3.direct:main"
+fish-drama3-qualify = "fish_drama3.qualification:main"
+
+[project.optional-dependencies]
+dev = ["pytest==9.1.1"]
+
+[tool.setuptools]
+packages = ["fish_drama3"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"

@@ -1,0 +1,29 @@
+name: CPU contracts
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  python-contracts:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+        with:
+          arch: x64
+          vsversion: "2022"
+      - run: python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.13.0
+      - run: python -m pip install -r requirements-runtime.txt pytest==9.1.1
+      - run: ./scripts/bootstrap.ps1
+        shell: pwsh
+      - run: cmake -S upstream/s2.cpp -B builds/s2-cpu -G Ninja -DCMAKE_BUILD_TYPE=Release -DS2_AUTO_APPLY_LOCAL_PATCHES=OFF
+      - run: cmake --build builds/s2-cpu --target ggml-base --parallel 1
+      - run: python -m pytest tests/test_cli.py tests/test_codec_adapter.py tests/test_direct.py tests/test_gguf_stream.py tests/test_hybrid.py tests/test_native_quant.py tests/test_qualification.py tests/test_watchdog.py -k "not test_live_sensors_are_readable"
+        env:
+          PYTHONPATH: .

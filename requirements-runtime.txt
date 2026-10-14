@@ -1,0 +1,10 @@
+# Install PyTorch separately from the official CUDA 13.2 wheel index; see README.
+numpy==2.2.6
+safetensors==0.6.2
+gguf==0.18.0
+tokenizers==0.22.1
+soundfile==0.13.1
+psutil==7.0.0
+scipy==1.18.1
+loguru==0.7.3
+tqdm==4.67.1

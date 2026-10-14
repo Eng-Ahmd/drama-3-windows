@@ -1,0 +1,23 @@
+LICENSING NOTICE
+
+This distribution contains and depends on components governed by different
+licenses. No single permissive license covers the complete runtime.
+
+The s2.cpp-derived native codec and modifications to it are distributed as
+derivative works subject to the Fish Audio Research License. That license
+permits research and non-commercial use and requires a separate Fish Audio
+agreement for commercial use. See LICENSES/FISH_AUDIO_RESEARCH_LICENSE.md.
+
+The pinned Fish Speech reference implementation and Drama 3 model materials
+retain the Fish Audio Community License v1.0. Its conditions apply independently
+and do not replace the license governing the codec donor. See
+LICENSES/FISH_AUDIO_COMMUNITY_LICENSE.md.
+
+GGML-derived operations and linked GGML libraries retain the MIT license. See
+LICENSES/GGML_MIT_LICENSE.txt. Other Python and platform dependencies retain
+their own licenses; see LICENSES/THIRD_PARTY_NOTICES.md.
+
+Modifications in this distribution remain subject to applicable upstream
+derivative-work terms. No additional commercial permission for Fish Audio
+materials is granted here. This notice supplements, and does not replace, the
+complete component licenses and attribution notices.

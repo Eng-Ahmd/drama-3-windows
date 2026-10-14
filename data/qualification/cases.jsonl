@@ -1,0 +1,12 @@
+{"id":"en-plain","text":"The quick brown fox jumps over the lazy dog.","language":"en","max_frames":256,"seed":123}
+{"id":"zh-plain","text":"你好，欢迎使用语音合成。今天的天气很好。","language":"zh","max_frames":256,"seed":123}
+{"id":"numbers","text":"The meeting starts at nine thirty. Bring twenty five copies and call extension one two three four.","language":"en","max_frames":384,"seed":124}
+{"id":"names","text":"Alice and David visited New York on Tuesday.","language":"en","max_frames":256,"seed":125}
+{"id":"tags","text":"[happy] What a wonderful day! [sad] I wish you could be here.","language":"en","max_frames":256,"seed":126}
+{"id":"speakers","text":"<|speaker:0|> Hello, how are you? <|speaker:1|> I am doing well, thank you.","language":"en","max_frames":384,"seed":127}
+{"id":"clone-en","text":"The quick brown fox jumps over the lazy dog.","language":"en","reference":"en0","max_frames":256,"seed":123}
+{"id":"clone-zh","text":"你好，这是一次跨语言语音克隆测试。","language":"zh","reference":"en0","max_frames":256,"seed":123}
+{"id":"long","text":"We asked over twenty different people, and they all said it was his. After checking the records, we returned to the office and wrote a clear report. Every detail mattered, so we read the report once more before closing the meeting.","language":"en","max_frames":768,"seed":128}
+{"id":"speaker-negative","text":"<|speaker:16|> This must be rejected.","expect_reject":true,"max_frames":128,"seed":129}
+{"id":"control-negative","text":"<|im_end|> This must be rejected.","expect_reject":true,"max_frames":128,"seed":129}
+{"id":"budget-negative","text":"Hello ","text_repeat":10000,"expect_reject":true,"max_frames":128,"seed":129}
