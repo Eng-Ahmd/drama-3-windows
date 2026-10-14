@@ -4,6 +4,18 @@ This Windows runtime has component numerical evidence. Component tests and
 finite speech output are useful evidence; they do not establish production
 quality, perceptual fidelity, or real-time speech performance.
 
+## Hub metadata compatibility
+
+Runtime 0.1.1 stores large tokenizer metadata as bounded UTF-8 strings and
+reassembles them before loading. The Hub's GGUF parser rejects individual strings
+above 10 MB; the initial embedded tokenizer string was 20,791,070 bytes. All 925
+tensor hashes and the complete tokenizer text are unchanged. The official Hub
+parser reports 35,899,643,008 parameters; the native descriptor check passed and
+one native CPU expert computation was bit-identical between both artifacts.
+Forty-seven targeted writer, converter, loader, CLI and generation checks passed.
+The acoustic and lifecycle results below refer to the 0.1.0 artifact; no synthesis
+arithmetic changed in this metadata patch. Older artifacts remain loadable.
+
 ## Frozen preview
 
 `data/qualification/cases.jsonl` contains twelve versioned preview cases:
