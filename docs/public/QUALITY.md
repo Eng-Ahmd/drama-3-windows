@@ -93,9 +93,11 @@ The first matched English example produced zero WER for both official and
 generated audio using Faster Whisper 1.2.1, CTranslate2 4.8.3 and the frozen
 `Systran/faster-whisper-base.en` revision
 `3d3d5dee26484f91867d81cb899cfcf72b96be6c`. This is one example, not an
-aggregate quality result. The frozen case failed: it reached its 384-frame limit without EOS, and ASR recognized only the first sentence. A finite waveform does not make the request complete. A separate guarded CLI run reached EOS at frame 169 and produced 7.848 seconds of audio in 39 seconds. ASR recognized the requested words but inserted “Haha” (WER 0.0714). This single-run observation is not an aggregate quality or speed result. Completed controlled source-history comparisons are described below.
+aggregate quality result. The original seed-124 numbers case failed: it reached its 384-frame limit without EOS, and ASR recognized only the first sentence. A finite waveform does not make the request complete. A separate guarded CLI run reached EOS at frame 169 and produced 7.848 seconds of audio in 39 seconds. ASR recognized the requested words but inserted “Haha” (WER 0.0714). This single-run observation is not an aggregate quality or speed result. Completed controlled source-history comparisons are described below.
 
 ## Evaluation scope and known behavior
+
+A separate run of the twelve functional cases used runtime 0.1.0 defaults: seed 123 for valid inputs, 200-character chunking and twelve GPU expert layers. All nine valid inputs reached EOS for every segment, all three invalid inputs were rejected, and the short anchor replay produced identical acoustic codes. Measured GPU, Torch and process memory drift at the final warmed replay was zero bytes at the same cache capacity. This is a functional completion check; it does not measure aggregate speech quality or replace the original mixed-seed corpus, whose seed-124 failure remains recorded.
 
 Runtime 0.1.0 adds bounded paragraph generation with audio-history conditioning.
 The previously stalled three-sentence passage completed at seed 123 in two
