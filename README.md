@@ -4,6 +4,8 @@ This repository contains the **Windows release 0.1.1** for running Fish Audio Dr
 
 The project includes a direct converter for the pinned Drama 3 checkpoint, an offline synthesis CLI, native CPU and CUDA components, and guarded evaluation tools. Model weights and compiled binaries are separate from this source tree. Download the converted model and codec from [Hugging Face](https://huggingface.co/Eng-Ahmd/Drama-3-Windows-GGUF), then follow the installation guide. Use runtime 0.1.1 or newer for the current bundles. Local conversion from the pinned checkpoint is also supported. Obtain model files under their applicable license terms and install the [prebuilt Windows libraries](https://github.com/Eng-Ahmd/drama-3-windows/releases) or build them locally. Source code is hosted at the [GitHub repository](https://github.com/Eng-Ahmd/drama-3-windows).
 
+[**Listen to the original / Windows audio comparisons**](https://huggingface.co/Eng-Ahmd/Drama-3-Windows-GGUF#listen-original-vs-windows) — expressive tags, contextual edits and chained edits, generated from the original voice reference.
+
 ## Start here
 
 - [Installation](docs/public/INSTALL.md) covers the Windows toolchain, Python environment, pinned sources, conversion, and a first synthesis command.

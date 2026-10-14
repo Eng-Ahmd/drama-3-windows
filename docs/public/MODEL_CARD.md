@@ -5,91 +5,154 @@ license_link: https://huggingface.co/fishaudio/drama-3/blob/dd64a85cd82e9521f720
 base_model: fishaudio/drama-3
 base_model_relation: quantized
 pipeline_tag: text-to-speech
+language:
+  - en
+  - zh
 tags:
   - fish-audio
   - drama-3
-  - text-to-speech
+  - gguf
   - windows
+  - voice-cloning
+  - multi-speaker
+  - emotional-speech-generation
+  - moe
 ---
 
-# Fish Audio Drama 3 — 35.9B — Windows runtime 0.1.1
+![Drama 3 for Windows](https://huggingface.co/Eng-Ahmd/Drama-3-Windows-GGUF/resolve/main/assets/drama3-windows.svg)
 
-This repository provides the Drama 3 Q4_K expert / Q8_0 backbone model and separate native-codec bundle for the [Windows runtime](https://github.com/Eng-Ahmd/drama-3-windows). Built with Fish Audio. The pinned upstream checkpoint is [Fish Audio Drama 3](https://huggingface.co/fishaudio/drama-3/tree/dd64a85cd82e9521f7202610ede97b367fc83946).
+# Drama 3 · Windows GGUF
 
-Download `model/model.gguf` with `model/manifest.json`, and `codec/codec.gguf` with `codec/manifest.json`. These files use the custom `fish_drama3` architecture and require the matching runtime. Follow its [installation guide](https://github.com/Eng-Ahmd/drama-3-windows/blob/main/docs/public/INSTALL.md) for the Windows libraries and Python environment.
+**Expressive speech, voice cloning and contextual editing on your own hardware.**
 
-## Model and runtime
+A Q4_K / Q8_0 release of [Fish Audio Drama 3](https://huggingface.co/fishaudio/drama-3), paired with a Windows inference engine that places routed experts across system RAM and CUDA. Built with Fish Audio.
 
-The speech model contains **35,899,643,008 parameters (35.9B total)**, matching the original checkpoint tensor count. Quantization changes storage precision, not the parameter count. The separate codec has 392,971,249 stored tensor elements (approximately 0.393B); it is not the speech model.
+[**Download the model**](https://huggingface.co/Eng-Ahmd/Drama-3-Windows-GGUF/tree/main/model) · [**Windows runtime**](https://github.com/Eng-Ahmd/drama-3-windows/releases/latest) · [**Installation**](https://github.com/Eng-Ahmd/drama-3-windows/blob/main/docs/public/INSTALL.md)
 
-`Drama-3-35.9B-Q4_K-Q8_0.gguf` is the root-level main-model alias for Hub indexing. It has the same SHA-256 and bytes as `model/model.gguf`. These files require runtime 0.1.1 or newer; upgrade the source if you installed 0.1.0. Older single-string model files remain loadable by 0.1.1. Download either copy of the model, not both; the existing installation commands use `model/model.gguf`.
+- **35.9B MoE** — 256 experts per layer, eight selected per token.
+- **Expressive voice cloning** — reference-conditioned speech with emotion and event tags.
+- **Audio-history conditioning** — contextual edits and continuity between long-text segments.
+- **Local CPU/CUDA execution** — configurable expert placement for limited GPU memory.
+- **44.1 kHz audio** — 21.67 GiB model and 1.46 GiB codec.
 
-The converted model bundle is approximately 21.67 GiB, with a separate V3 codec bundle of approximately 1.46 GiB. These bundle sizes are provided to plan local conversion and storage; the weights are not part of the source-code repository.
+## Listen: original vs Windows
 
-The source checkpoint combines FP8 and BF16 tensors. The converter streams it into a custom `fish_drama3` GGUF model bundle using this recipe:
+The three demos from the [original model card](https://huggingface.co/fishaudio/drama-3#example-usage), reproduced with the same voice reference, requested text and prior-take context. Original recordings are provided by Fish Audio; the Windows recordings below were generated with this quantized release.
 
-- Expert matrices: Q4_K across the 256-expert banks; the model routes to eight experts per token.
-- Backbone matrices: Q8_0.
-- Sensitive vectors: F32.
-- Audio tower matrices: BF16. Codec learned weights: F32, with original BF16 RoPE tables.
-- GGUF custom architecture: `fish_drama3`, requiring this repository's matching runtime rather than generic llama.cpp support.
+### Shared voice reference
 
-The converted model contains 925 tensors and 23,270,210,720 bytes (about 21.67 GiB). The separate V3 codec bundle contains 458 tensors and 1,568,779,744 bytes (about 1.46 GiB). The manifests include complete file and tensor hashes for verification. Runtime 0.1.1 splits the embedded tokenizer JSON into UTF-8 metadata chunks below the Hub parser limit. All 925 tensor payload hashes and the complete tokenizer text match the initial release exactly; only the file header and whole-file hash change.
+The original **en0** reference clip used by all three examples:
 
-### Runtime compatibility
+<audio controls preload="metadata" style="width:100%;max-width:100%;"><source src="https://github.com/user-attachments/files/33393249/en0.wav" type="audio/wav"></audio>
 
-Inference is hybrid: PyTorch executes the backbone and audio tower, native GGML CPU/CUDA libraries execute routed experts, and the native codec handles reference encoding and audio decoding. This is not a fully native C++ model graph. The custom `fish_drama3` GGUF architecture requires the matching project runtime; generic llama.cpp does not support it. The measured target was Windows 11 with a 16 GiB RTX 5080 Laptop GPU, Visual Studio 2022, CUDA Toolkit 13.3, and PyTorch 2.13.0+cu132. A clean-machine installation has not been established.
+### 1 · Expressive point tags
 
-## Intended use
+A single voice moves from a sigh to spoken dialogue and laughter, using `[sighs]` and `[laughs]` in the prompt.
 
-The Windows runtime supports local Drama 3 inference, development, and evaluation. Synthesis is offline and uses this matching runtime; generic GGUF engines do not implement its model graph. Use voice-reference audio only when you have the necessary rights and the speaker's consent.
+<table style="display:table;width:100%;table-layout:fixed;">
+<tr><th width="50%">Fish Audio original</th><th width="50%">Windows · Q4_K / Q8_0</th></tr>
+<tr>
+<td><audio controls preload="metadata" style="width:100%;max-width:100%;"><source src="https://github.com/user-attachments/files/33393205/A1_point_tags.wav" type="audio/wav"></audio></td>
+<td><audio controls preload="metadata" style="width:100%;max-width:100%;"><source src="https://huggingface.co/Eng-Ahmd/Drama-3-Windows-GGUF/resolve/main/demos/point-tags.wav" type="audio/wav"></audio></td>
+</tr>
+</table>
 
-## Evaluation
+### 2 · Edit with context
 
-The native codec reproduced all 850 reference acoustic codes in the checked example. Decoding the corresponding 87 frames returned the same 178,176 samples as the reference decode, with relative RMSE 1.74×10⁻⁶. This is codec component evidence; it does not establish perceptual parity across general audio.
+Change **Wednesday → Thursday** in a spoken report reminder. The earlier take is supplied as acoustic history, preserving the voice and context while revising the line.
 
-In one matched English voice-reference example, the reference and generated audio both scored 0.0 WER with the same Faster Whisper base.en evaluator. The original clip is 9.195 seconds long and the generated clip is 7.895 seconds long; these are audio durations, not synthesis latency. Listening found the generated voice close in that example, with a difference in the sigh. There is no objective speaker-similarity baseline.
+<table style="display:table;width:100%;table-layout:fixed;">
+<tr><th width="50%">Fish Audio original</th><th width="50%">Windows · Q4_K / Q8_0</th></tr>
+<tr>
+<td><audio controls preload="metadata" style="width:100%;max-width:100%;"><source src="https://github.com/user-attachments/files/33393156/K1_edit_word_with_context.wav" type="audio/wav"></audio></td>
+<td><audio controls preload="metadata" style="width:100%;max-width:100%;"><source src="https://huggingface.co/Eng-Ahmd/Drama-3-Windows-GGUF/resolve/main/demos/contextual-edit.wav" type="audio/wav"></audio></td>
+</tr>
+</table>
 
-A separate guarded CLI run reached EOS at frame 169, producing 7.848 seconds of audio in 39 seconds. ASR recognized the requested words but inserted “Haha” (WER 0.0714). This is a single-run observation, not a speed or aggregate quality result.
+### 3 · Chained edit
 
-One 12-GPU-expert-layer run on the 16 GiB target ended with 2.67 GiB of GPU memory free. Native allocations are not fully reflected by PyTorch allocator counters, and this observation does not establish a maximum safe profile.
+Change the deadline from **noon → five**, with both earlier takes retained as acoustic history.
 
-Runtime 0.1.0 generates long requests in bounded text segments with audio-history conditioning. The checked three-sentence passage completed all text in 14.12 seconds of audio, with a longest measured near-silent interval of 20 ms. The short reference-clone regression produced the same PCM WAV bytes as the previous CLI path.
+<table style="display:table;width:100%;table-layout:fixed;">
+<tr><th width="50%">Fish Audio original</th><th width="50%">Windows · Q4_K / Q8_0</th></tr>
+<tr>
+<td><audio controls preload="metadata" style="width:100%;max-width:100%;"><source src="https://github.com/user-attachments/files/33393164/K5_second_edit_chained.wav" type="audio/wav"></audio></td>
+<td><audio controls preload="metadata" style="width:100%;max-width:100%;"><source src="https://huggingface.co/Eng-Ahmd/Drama-3-Windows-GGUF/resolve/main/demos/chained-edit.wav" type="audio/wav"></audio></td>
+</tr>
+</table>
 
-Four short English checks had zero ASR WER. Chinese plain speech had zero CER with a pinned multilingual evaluator; a cross-language clone had 13.33% CER from two homophonous character substitutions. These are individual intelligibility checks rather than aggregate quality or speaker-similarity scores.
+<details>
+<summary>Demo settings and reproduction</summary>
 
-The recorded numbers prompt can stall at seed 124; the default seed 123 completed both sentences. Finite partial audio is marked incomplete and requires explicit opt-in. The [quality report](https://github.com/Eng-Ahmd/drama-3-windows/blob/main/docs/public/QUALITY.md) retains the failing runs, controlled source-history comparisons and remaining long-session, cancellation, acoustic-holdout and clean-machine checks.
+Local recordings use seed 123, temperature 0.7, top-p 0.7, top-k 30 and twelve GPU expert layers. The source demos do not publish their random seeds or sampling settings. Generation is stochastic; timing, expression and nonverbal events can differ.
 
-The Windows runtime also completed a guarded two-hour lifecycle soak with 713
-successful speech requests and 143 invalid-input recovery cycles. The repeated
-seeded sentence retained identical acoustic codes; measured Torch allocation
-and CUDA-use drift were zero. This controlled workload checks runtime stability;
-varied-content quality and cancellation have separate evaluation limits.
+The contextual examples include generated acoustic tokens from the earlier takes, not just their transcripts. After installing the runtime, download the shared reference and generate the demos:
 
-## Data and provenance
-
-The pinned upstream sources are:
-
-- [Fish Audio Drama 3](https://huggingface.co/fishaudio/drama-3/tree/dd64a85cd82e9521f7202610ede97b367fc83946), revision `dd64a85cd82e9521f7202610ede97b367fc83946`.
-- [Fish Speech](https://github.com/fishaudio/fish-speech/tree/1ff3c3ed2f80d3106a83909dd25b83129c3d816f), revision `1ff3c3ed2f80d3106a83909dd25b83129c3d816f`, used for selected reference model code.
-- [s2.cpp](https://github.com/rodrigomatta/s2.cpp/tree/2c33261938da1a41d713768b1b391b4d368d7d2c), revision `2c33261938da1a41d713768b1b391b4d368d7d2c`.
-- [GGML](https://github.com/ggml-org/ggml/tree/57ea0bc119d722d74594196cc5b494a34dd87be4), revision `57ea0bc119d722d74594196cc5b494a34dd87be4`.
-
-The donor-derived native build compiles the s2.cpp codec and logging sources with local precision overlays and uses its headers. GGML supplies backend and quantization components. Published [Jmica Drama 3 GGUF](https://huggingface.co/Jmica/Drama-3-GGUF) and [audio.cpp](https://github.com/0xShug0/audio.cpp/tree/a4a4c07ff9af10c437c777eeabf31677eea62668) material was consulted as references; Jmica model artifacts and audio.cpp source files are not redistributed by this repository. The s2.cpp checkout is fetched at the pinned revision during bootstrap rather than bundled in the source archive.
-
-The source pin manifest [source pin manifest](https://github.com/Eng-Ahmd/drama-3-windows/blob/main/data/source/drama3-dd64a85-sha256.json) records hashes for the checkpoint files used by conversion.
-
-## Licensing
-
-The original model and model-derived weights are governed by the Fish Audio Community License v1.0. This runtime also includes s2.cpp-derived codec work governed separately by the Fish Audio Research License. That donor license requires a separate written Fish Audio agreement for commercial use; the model's Community License does not replace or satisfy it. GGML components retain the MIT license. Read [NOTICE.md](https://github.com/Eng-Ahmd/drama-3-windows/blob/main/NOTICE.md) and all component license texts before use or redistribution.
-
-## Citation and credit
-
-Please retain the required Fish Audio attribution and identify the pinned sources when redistributing applicable components. This project is an independent integration and makes no endorsement claim on behalf of Fish Audio, s2.cpp contributors, or GGML contributors.
-
-```text
-Fish Audio Drama 3, checkpoint revision dd64a85cd82e9521f7202610ede97b367fc83946.
-Fish Speech reference, revision 1ff3c3ed2f80d3106a83909dd25b83129c3d816f.
-s2.cpp codec donor, revision 2c33261938da1a41d713768b1b391b4d368d7d2c.
-GGML, revision 57ea0bc119d722d74594196cc5b494a34dd87be4.
+```powershell
+Invoke-WebRequest -Uri "https://github.com/user-attachments/files/33393249/en0.wav" -OutFile en0.wav
+python -m fish_drama3.watchdog --output runs/demo-watchdog -- python -m examples.generate_model_card_demos --bundle models/drama3-windows/model --codec models/drama3-windows/codec/codec.gguf --reference en0.wav --output runs/demos
 ```
+
+ Run [the demo generator](https://github.com/Eng-Ahmd/drama-3-windows/blob/main/examples/generate_model_card_demos.py) through the runtime watchdog to reproduce the sequence. [Demo settings and measurements](https://huggingface.co/Eng-Ahmd/Drama-3-Windows-GGUF/blob/main/demos/generation.json).
+
+</details>
+
+## Model & runtime
+
+| Component | Configuration |
+|---|---|
+| Speech model | 35.9B MoE, hybrid full / linear attention |
+| Routed experts | Q4_K · 8 of 256 selected per token |
+| Backbone | Q8_0; sensitive vectors in F32 |
+| Audio tower | BF16 · 10 acoustic codebooks |
+| Codec | Native reference encoder / decoder; F32 learned weights |
+| Output | Mono 44.1 kHz PCM16 WAV |
+| Download size | Model 21.67 GiB · codec 1.46 GiB |
+| Engine | Windows runtime 0.1.1 or newer |
+
+**Execution path:** PyTorch runs the backbone and audio tower; GGML CPU/CUDA runs routed experts; the native codec encodes the voice reference and decodes the generated audio. The `fish_drama3` GGUF files require this matching engine.
+
+### Measured generation
+
+Windows 11 · RTX 5080 Laptop, 16 GiB VRAM · 128 GiB RAM · 12 GPU expert layers · 8 CPU threads. These are warm-model, single-request measurements for the recordings above, with CPU codec processing.
+
+| Example | Audio length | Generation | Gen + decode | RTF |
+|---|---:|---:|---:|---:|
+| Expressive tags | 7.85 s | 40.30 s | 47.87 s | 6.10 |
+| Contextual edit | 4.27 s | 13.38 s | 17.28 s | 4.04 |
+| Chained edit | 4.37 s | 14.35 s | 18.32 s | 4.20 |
+
+RTF is synthesis time divided by audio length. Timings include model prefill, generation and native codec decode; they exclude one-time model loading, reference encoding and file writing. Model loading took 23.04 seconds for this run.
+
+
+Generation is offline. The watchdog reserves at least 1 GiB GPU memory and 8 GiB host RAM; expert placement is configurable. Prebuilt CUDA libraries target SM120. The documented environment uses Python 3.13, PyTorch 2.13.0+cu132, CUDA Toolkit 13.3 and the Visual C++ x64 runtime.
+
+## Download & run
+
+Install the [Windows runtime and Python environment](https://github.com/Eng-Ahmd/drama-3-windows/blob/main/docs/public/INSTALL.md), then download the model and codec with their manifests:
+
+```powershell
+python -m pip install "huggingface_hub>=1.0,<2"
+python -c "from huggingface_hub import snapshot_download; snapshot_download('Eng-Ahmd/Drama-3-Windows-GGUF', local_dir='models/drama3-windows', allow_patterns=['model/*', 'codec/*', 'LICENSE', 'LICENSES/*', 'NOTICE.md'])"
+fish-drama3 synth --bundle models/drama3-windows/model --codec models/drama3-windows/codec/codec.gguf --text "Every voice has a story. Let's make yours heard." --output outputs/hello.wav --gpu-expert-layers 12
+```
+
+For voice cloning, add `--reference-audio` and its `--reference-text`. Long text uses bounded segments with audio-history conditioning. Complete output requires EOS; the CLI verifies file hashes and preserves existing results.
+
+The root-level `Drama-3-35.9B-Q4_K-Q8_0.gguf` is an identical alias of `model/model.gguf`; download one copy of the model.
+
+## Quality & validation
+
+- **Reference codec:** all 850 checked acoustic codes matched; decode relative RMSE **1.74 × 10⁻⁶** against the pinned reference.
+- **Intelligibility:** four short English checks had **0.0 ASR WER**; a Chinese plain-speech check had **0.0 CER**.
+- **Runtime stability:** a guarded two-hour run completed **713 speech requests** and **143 validation recovery cycles**, with identical acoustic codes for the repeated seeded request.
+
+These are targeted checks, not aggregate speech-quality or speaker-similarity scores. Seed-dependent incomplete generation and the evaluation method are documented in the [quality report](https://github.com/Eng-Ahmd/drama-3-windows/blob/main/docs/public/QUALITY.md).
+
+## Credits & license
+
+Model and reference implementation: [Fish Audio Drama 3](https://huggingface.co/fishaudio/drama-3) and [Fish Speech](https://github.com/fishaudio/fish-speech). Native codec integration derives from [s2.cpp](https://github.com/rodrigomatta/s2.cpp); backend and quantization components use [GGML](https://github.com/ggml-org/ggml). [audio.cpp](https://github.com/0xShug0/audio.cpp) and [Jmica's Drama 3 GGUF](https://huggingface.co/Jmica/Drama-3-GGUF) informed the porting survey. Pinned revisions and component attribution are in [NOTICE.md](https://github.com/Eng-Ahmd/drama-3-windows/blob/main/NOTICE.md).
+
+Model-derived weights retain the **Fish Audio Community License v1.0**. The donor-derived codec is separately governed by the **Fish Audio Research License**, which requires a written Fish Audio agreement for commercial use. GGML components retain their MIT license. See [LICENSE](https://huggingface.co/Eng-Ahmd/Drama-3-Windows-GGUF/blob/main/LICENSE) and [component licenses](https://huggingface.co/Eng-Ahmd/Drama-3-Windows-GGUF/tree/main/LICENSES).
+
+Use voice references with the necessary rights and speaker consent. This is an independent Windows integration. **Built with Fish Audio.**
