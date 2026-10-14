@@ -8,7 +8,7 @@ import os
 import sys
 import time
 import uuid
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from pathlib import Path
 from collections.abc import Iterator
 
@@ -184,10 +184,12 @@ def main() -> None:
     stop = thread = None
     try:
         args = parse_options()
+        from fish_drama3.watchdog import guarded_job_lock
+        lease = nullcontext() if os.environ.get("FISH_DRAMA3_WATCHDOG_ACTIVE") == "1" else guarded_job_lock()
         if os.environ.get("FISH_DRAMA3_WATCHDOG_ACTIVE") == "1":
             from fish_drama3.watchdog import start_child_telemetry
             stop, thread = start_child_telemetry()
-        with output_claim(args.output):
+        with lease, output_claim(args.output):
             print(json.dumps(synthesize(args), indent=2), flush=True)
     except (ValueError, RuntimeError, OSError) as error:
         print(f"fish-drama3: {error}", file=sys.stderr)

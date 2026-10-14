@@ -1,5 +1,7 @@
 """Check completed audio publication and bounded reference preprocessing."""
 import json
+from types import SimpleNamespace
+from unittest.mock import Mock
 from pathlib import Path
 
 import numpy as np
@@ -7,6 +9,31 @@ import pytest
 import soundfile as sf
 
 from fish_drama3.cli import output_claim, publish_wave, reference_audio
+
+
+@pytest.mark.parametrize("guarded_parent", [False, True])
+def test_cli_respects_shared_lease_and_guarded_parent(tmp_path: Path, monkeypatch, guarded_parent: bool) -> None:
+    import fish_drama3.cli as cli
+    import fish_drama3.watchdog as watchdog
+
+    lock = tmp_path / "gpu.lock"
+    lease = watchdog.guarded_job_lock
+    monkeypatch.setattr(watchdog, "guarded_job_lock", lambda: lease(lock))
+    monkeypatch.setattr(watchdog, "start_child_telemetry", lambda: (Mock(), Mock()))
+    monkeypatch.setattr(cli, "parse_options", lambda: SimpleNamespace(output=tmp_path / "result.wav"))
+    synthesis = Mock(return_value=dict(complete=True))
+    monkeypatch.setattr(cli, "synthesize", synthesis)
+    monkeypatch.setenv("FISH_DRAMA3_WATCHDOG_ACTIVE", "1" if guarded_parent else "0")
+    with lease(lock):
+        if guarded_parent:
+            cli.main()
+            synthesis.assert_called_once()
+        else:
+            with pytest.raises(SystemExit) as error:
+                cli.main()
+            assert error.value.code == 2
+            synthesis.assert_not_called()
+    assert not (tmp_path / "result.lock").exists()
 
 
 def test_concurrent_claim_refused_and_released(tmp_path: Path) -> None:

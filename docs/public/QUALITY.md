@@ -24,7 +24,9 @@ it is not a standalone native model graph.
 The watchdog holds a shared workspace process lock before launching a GPU job.
 Another guarded launcher fails without starting its child until that lock is
 released. The operating system releases the lock when its owner exits. Keep the
-same default lock path for all jobs; unwrapped processes are outside this guard.
+same default lock path for all jobs. The synthesis CLI shares this lock when run
+directly and uses its parent watchdog's lease when wrapped. Other applications
+and inference entry points are outside this guard.
 
 Run the qualification process through the external watchdog. It records the
 actual GPU-free-memory, host-free-memory and system-commit thresholds supplied
