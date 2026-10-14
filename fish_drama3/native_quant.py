@@ -17,15 +17,17 @@ Q4_K = 12
 TYPE_SIZES: dict[int, tuple[int, int]] = {Q8_0: (32, 34), Q4_K: (256, 144)}
 MAX_INPUT_BYTES = 64 * 1024 * 1024
 DLL_PATH = Path(__file__).resolve().parents[1] / "builds/s2-cpu/bin/ggml-base.dll"
+PREBUILT_DLL_PATH = Path(__file__).resolve().parents[1] / "builds/drama3-inspect/Release/ggml-base.dll"
 
 
 @lru_cache(maxsize=1)
 def _library() -> ctypes.CDLL:
     """Bind the ABI declared in the pinned ggml/include/ggml.h."""
-    if not DLL_PATH.is_file():
-        raise FileNotFoundError(f"Build the pinned s2 CPU GGML library: {DLL_PATH}")
+    path = DLL_PATH if DLL_PATH.is_file() else PREBUILT_DLL_PATH
+    if not path.is_file():
+        raise FileNotFoundError("Install the prebuilt runtime or build the pinned CPU GGML library")
     try:
-        library = ctypes.CDLL(str(DLL_PATH))
+        library = ctypes.CDLL(str(path))
         library.ggml_blck_size.argtypes = [ctypes.c_int]
         library.ggml_blck_size.restype = ctypes.c_int64
         library.ggml_type_size.argtypes = [ctypes.c_int]
@@ -41,7 +43,7 @@ def _library() -> ctypes.CDLL:
         ]
         library.ggml_validate_row_data.restype = ctypes.c_bool
     except (OSError, AttributeError) as error:
-        raise RuntimeError(f"Cannot bind pinned GGML quantizer: {DLL_PATH}") from error
+        raise RuntimeError(f"Cannot bind pinned GGML quantizer: {path}") from error
     for kind, (block, size) in TYPE_SIZES.items():
         actual = (library.ggml_blck_size(kind), library.ggml_type_size(kind))
         if actual != (block, size):

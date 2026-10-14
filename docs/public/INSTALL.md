@@ -14,7 +14,7 @@ This guide installs or builds the Windows release `0.1.0rc1` on Windows 11. The 
 
 The `fish-drama3-windows-runtime-0.1.0rc1-win-x64.zip` release archive contains the tested CPU and CUDA runtime DLLs. Extract it at the repository root so the files land under `builds/drama3-inspect/Release` and `builds/drama3-cuda/Release`; do not rename those directories. Check the included `SHA256SUMS.txt` against the extracted DLL and license files before use.
 
-Install the Microsoft Visual C++ 2015–2022 x64 Redistributable separately; it is not included. CUDA inference also requires an NVIDIA driver and CUDA Toolkit 13.3 or newer. NVIDIA and Microsoft DLLs are not redistributed in the archive. The Python environment and pinned Fish Speech reference checkout are still required; run `scripts/bootstrap.ps1` to fetch and verify source pins. The prebuilt archive avoids compiling the runtime libraries. Converting a checkpoint locally still requires the pinned CPU donor quantizer produced by the source build workflow below.
+Install the Microsoft Visual C++ 2015–2022 x64 Redistributable separately; it is not included. CUDA inference also requires an NVIDIA driver and CUDA Toolkit 13.3 or newer. NVIDIA and Microsoft DLLs are not redistributed in the archive. The Python environment and pinned Fish Speech reference checkout are still required; run `scripts/bootstrap.ps1` to fetch and verify source pins. The prebuilt archive avoids compiling the runtime libraries. The included CPU GGML library also provides the pinned quantizer for local conversion; a source build is optional when using this archive.
 
 The archive does not include model weights. Use it with a converted model and codec bundle that you have obtained or built under their applicable licenses. Use `--gpu-expert-layers 0` for the CPU expert bridge; CUDA expert placement requires a compatible GPU and the CUDA prerequisites above.
 ## Create the Python environment
@@ -97,3 +97,4 @@ The CI job also runs watchdog logic tests but excludes the live NVIDIA sensor ch
 ## Licensing
 
 The runtime contains separately licensed model-related and codec-donor components. The s2.cpp-derived codec is subject to the Fish Audio Research License and requires a separate written agreement for commercial use. Review [NOTICE.md](../../NOTICE.md) and the component texts under [`LICENSES/`](../../LICENSES/THIRD_PARTY_NOTICES.md) before building or redistributing.
+
