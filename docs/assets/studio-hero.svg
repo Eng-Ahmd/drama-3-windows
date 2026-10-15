@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="440" viewBox="0 0 1440 440" role="img" aria-labelledby="title description">
+  <title id="title">Fish Audio Drama 3 — Windows Studio</title>
+  <desc id="description">A dark charcoal and teal banner for the independent Windows speech generation runtime, with abstract acoustic waveform artwork.</desc>
+  <defs>
+    <linearGradient id="background" x2="1" y2="1">
+      <stop stop-color="#11191e"/>
+      <stop offset=".58" stop-color="#0d131a"/>
+      <stop offset="1" stop-color="#102b2b"/>
+    </linearGradient>
+    <linearGradient id="wave" x2="1">
+      <stop stop-color="#64dbc0" stop-opacity="0"/>
+      <stop offset=".34" stop-color="#73e4cb" stop-opacity=".9"/>
+      <stop offset=".72" stop-color="#70c9d8" stop-opacity=".65"/>
+      <stop offset="1" stop-color="#70c9d8" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="edge" x2="1">
+      <stop stop-color="#78dac3" stop-opacity=".55"/>
+      <stop offset=".45" stop-color="#78dac3" stop-opacity=".05"/>
+      <stop offset="1" stop-color="#78dac3" stop-opacity=".2"/>
+    </linearGradient>
+    <radialGradient id="glow">
+      <stop stop-color="#29776b" stop-opacity=".25"/>
+      <stop offset="1" stop-color="#29776b" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M40 0H0V40" fill="none" stroke="#9bdbd1" stroke-opacity=".065" stroke-width="1"/>
+    </pattern>
+    <path id="acoustic" d="M0 180H38C60 180 60 175 74 175S92 189 105 180 120 159 132 180 149 208 160 180 175 135 188 180 205 241 218 180 235 89 248 180 265 285 278 180 295 48 308 180 325 315 338 180 355 73 368 180 385 271 398 180 415 118 428 180 445 246 458 180 475 135 488 180 505 217 518 180 535 150 548 180 565 200 578 180 595 168 608 180 625 188 638 180 655 176 668 180H740"/>
+  </defs>
+  <rect width="1440" height="440" rx="18" fill="url(#background)"/>
+  <rect x="1" y="1" width="1438" height="438" rx="17" fill="none" stroke="#354b4d" stroke-opacity=".75"/>
+  <path d="M24 1H1416" stroke="url(#edge)"/>
+  <g transform="translate(668 20)">
+    <ellipse cx="380" cy="200" rx="410" ry="270" fill="url(#glow)"/>
+    <rect width="750" height="400" fill="url(#grid)"/>
+    <path d="M0 200H750" stroke="#7dd9c5" stroke-opacity=".1"/>
+    <g transform="translate(0 20)" fill="none" stroke="url(#wave)">
+      <use href="#acoustic" transform="translate(0 36) scale(1 .8)" stroke-width="1" opacity=".15"/>
+      <use href="#acoustic" transform="translate(0 18) scale(1 .9)" stroke-width="1" opacity=".3"/>
+      <use href="#acoustic" stroke-width="1.6"/>
+      <use href="#acoustic" transform="translate(0 -18) scale(1 1.1)" stroke-width="1" opacity=".22"/>
+      <use href="#acoustic" transform="translate(0 -36) scale(1 1.2)" stroke-width="1" opacity=".1"/>
+    </g>
+    <g fill="#89d9c8" opacity=".3">
+      <circle cx="280" cy="12" r="2"/>
+      <circle cx="600" cy="92" r="2"/>
+      <circle cx="160" cy="332" r="2"/>
+      <circle cx="680" cy="372" r="2"/>
+    </g>
+  </g>
+  <g font-family="Segoe UI, Arial, sans-serif">
+    <g transform="translate(64 57)" fill="#75dcc3">
+      <rect x="0" y="10" width="5" height="12" rx="2.5"/>
+      <rect x="10" y="0" width="5" height="32" rx="2.5"/>
+      <rect x="20" y="6" width="5" height="20" rx="2.5"/>
+      <rect x="30" y="12" width="5" height="8" rx="2.5"/>
+    </g>
+    <text x="115" y="78" fill="#9db2ba" font-size="12" font-weight="600" letter-spacing="2.8">LOCAL VOICE. CREATIVE FREEDOM.</text>
+    <text x="62" y="165" fill="#f0f6f7" font-size="53" font-weight="600" letter-spacing="-2">Fish Audio Drama 3</text>
+    <text x="65" y="210" fill="#78dcc5" font-size="27" font-weight="400" letter-spacing="-.4">Windows Studio</text>
+    <text x="65" y="270" fill="#a2b2c1" font-size="19">Local speech generation, from script to sound.</text>
+    <text x="65" y="302" fill="#8195a7" font-size="15">GGUF inference · Voice conditioning · Browser workspace</text>
+    <path d="M65 346H475" stroke="#33494c"/>
+    <text x="65" y="378" fill="#6f8b96" font-size="11" letter-spacing="1.1">INDEPENDENT WINDOWS RUNTIME</text>
+  </g>
+</svg>

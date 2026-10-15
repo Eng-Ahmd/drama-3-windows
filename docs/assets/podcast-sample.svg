@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="260" viewBox="0 0 1200 260" role="img" aria-labelledby="title description">
+  <title id="title">Listen to The Small Signal — 3 minutes 16 seconds</title>
+  <desc id="description">A 592-word podcast generated in one request with no speech edits. Click the linked card to listen to the audio sample.</desc>
+  <defs>
+    <linearGradient id="background" x2="1" y2="1">
+      <stop stop-color="#152525"/>
+      <stop offset=".55" stop-color="#101b22"/>
+      <stop offset="1" stop-color="#11242a"/>
+    </linearGradient>
+    <linearGradient id="wave" x2="1">
+      <stop stop-color="#77ddc7" stop-opacity="0"/>
+      <stop offset=".3" stop-color="#77ddc7" stop-opacity=".6"/>
+      <stop offset=".7" stop-color="#81bccc" stop-opacity=".5"/>
+      <stop offset="1" stop-color="#81bccc" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="halo">
+      <stop stop-color="#79dfc3" stop-opacity=".13"/>
+      <stop offset="1" stop-color="#79dfc3" stop-opacity="0"/>
+    </radialGradient>
+    <path id="waveform" d="M0 130H25Q35 130 43 122T60 130T77 105T94 146T111 88T128 165T145 67T162 186T179 83T196 175T213 48T230 205T247 77T264 181T281 60T298 195T315 93T332 163T349 107T366 151T383 117T400 136T417 126T434 130H470"/>
+  </defs>
+  <rect x="1" y="1" width="1198" height="258" rx="15" fill="url(#background)" stroke="#35564f"/>
+  <ellipse cx="100" cy="125" rx="150" ry="150" fill="url(#halo)"/>
+  <g transform="translate(716 0)" fill="none" stroke="url(#wave)">
+    <path d="M0 130H470" stroke="#77ddc7" stroke-opacity=".08"/>
+    <use href="#waveform" stroke-width="1.4"/>
+    <use href="#waveform" transform="translate(0 19.5) scale(1 .85)" stroke-width="1" opacity=".24"/>
+    <use href="#waveform" transform="translate(0 -19.5) scale(1 1.15)" stroke-width="1" opacity=".12"/>
+  </g>
+  <circle cx="100" cy="127" r="43" fill="#1e4037" stroke="#5ba78f" stroke-opacity=".6"/>
+  <circle cx="100" cy="127" r="51" fill="none" stroke="#75d6bd" stroke-opacity=".08"/>
+  <path d="M92 111L115 127L92 143Z" fill="#8aebcd"/>
+  <g font-family="Segoe UI, Arial, sans-serif">
+    <text x="179" y="64" fill="#7bbaa9" font-size="10" font-weight="600" letter-spacing="2">HEAR THE MODEL</text>
+    <text x="177" y="112" fill="#ecf4f5" font-size="35" font-weight="600" letter-spacing="-1">The Small Signal</text>
+    <text x="180" y="147" fill="#a2b9c3" font-size="15">3:16 <tspan fill="#4c686c">  /  </tspan>592 words</text>
+    <g transform="translate(179 170)">
+      <rect width="237" height="29" rx="5" fill="#18342d" stroke="#31564a"/>
+      <circle cx="14" cy="14.5" r="3" fill="#78d3b3"/>
+      <text x="26" y="19" fill="#a4d6c4" font-size="11">One request · No speech edits</text>
+    </g>
+    <text x="180" y="228" fill="#5f8b8b" font-size="10" letter-spacing=".5">FISH AUDIO DRAMA 3 · WINDOWS STUDIO</text>
+    <g transform="translate(996 183)">
+      <rect width="154" height="34" rx="6" fill="#77dcc0"/>
+      <text x="19" y="22" fill="#102d26" font-size="11" font-weight="600">Listen to sample</text>
+      <path d="M127 12H134V19M126 20L134 12" fill="none" stroke="#102d26" stroke-width="1.2"/>
+    </g>
+  </g>
+</svg>

@@ -11,6 +11,9 @@ if (-not $target.StartsWith($sourceRoot + [IO.Path]::DirectorySeparatorChar, [St
 
 # Source only: every path is individually named. Never recursively copy a project directory.
 $allowlist = @(
+    'docs/assets/studio-hero.svg', 'docs/assets/podcast-sample.svg',
+    'docs/assets/studio-overview.jpg', 'docs/assets/studio-progress.jpg',
+    'docs/assets/studio-podcast.jpg',
     'README.md', 'NOTICE.md', 'LICENSE',
     'LICENSES/FISH_AUDIO_RESEARCH_LICENSE.md',
     'LICENSES/FISH_AUDIO_COMMUNITY_LICENSE.md', 'LICENSES/GGML_MIT_LICENSE.txt',
@@ -48,6 +51,9 @@ $allowlist = @(
     'docs/public/MODEL_CARD.md', 'docs/public/QUALITY.md'
 )
 $requiredPaths = @(
+    'docs/assets/studio-hero.svg', 'docs/assets/podcast-sample.svg',
+    'docs/assets/studio-overview.jpg', 'docs/assets/studio-progress.jpg',
+    'docs/assets/studio-podcast.jpg',
     'README.md', 'NOTICE.md', 'LICENSE', 'pyproject.toml', 'requirements-runtime.txt',
     'data/source/drama3-dd64a85-sha256.json',
     'LICENSES/FISH_AUDIO_RESEARCH_LICENSE.md',

@@ -1,58 +1,89 @@
-# Fish Audio Drama 3 for Windows
+![Fish Audio Drama 3 · Windows Studio](docs/assets/studio-hero.svg)
 
-This repository contains the **Windows release 0.2.0** for running Fish Audio Drama 3 on Windows. It combines a PyTorch model path with native GGML expert execution and a native audio codec. It is a hybrid Windows runtime, not a standalone C++ model engine.
+# Give your words a voice. On your own hardware.
 
-The project includes a direct converter for the pinned Drama 3 checkpoint, an offline synthesis CLI, native CPU and CUDA components, and guarded evaluation tools. Model weights and compiled binaries are separate from this source tree. Download the converted model and codec from [Hugging Face](https://huggingface.co/Eng-Ahmd/Drama-3-Windows-GGUF), then follow the installation guide. Use runtime 0.1.1 or newer for the current bundles. Local conversion from the pinned checkpoint is also supported. Obtain model files under their applicable license terms and install the [prebuilt Windows libraries](https://github.com/Eng-Ahmd/drama-3-windows/releases) or build them locally. Source code is hosted at the [GitHub repository](https://github.com/Eng-Ahmd/drama-3-windows).
+**Expressive speech, voice cloning and full-script narration in a local Windows studio.** Load Drama 3 once, shape the performance, listen and export your recording with the settings that made it.
 
-[**Listen to the original / Windows audio comparisons**](https://huggingface.co/Eng-Ahmd/Drama-3-Windows-GGUF#listen-original-vs-windows) — expressive tags, contextual edits and chained edits, generated from the original voice reference.
+[**Get Windows Studio 0.2.0**](https://github.com/Eng-Ahmd/drama-3-windows/releases/latest) · [**Download the model**](https://huggingface.co/Eng-Ahmd/Drama-3-Windows-GGUF) · [**Installation**](docs/public/INSTALL.md) · [**Studio guide**](docs/public/WEB_UI.md)
 
-## Generate in your browser
+![Windows Studio showing the script editor, generation controls and live system vitals](docs/assets/studio-overview.jpg)
 
-The local web app requires the 0.2.0 Python runtime and matching native bridge. It provides model load/unload, sample scripts, supported generation settings, voice references, playback and WAV/MP3 downloads with saved settings. Install the runtime using the [installation guide](docs/public/INSTALL.md), then run:
+*The actual Windows Studio during generation. Live hardware readings and stage counters reflect this capture, rather than benchmark targets.*
+
+## A speech studio built around your workflow
+
+- **Write, clone, perform.** Use your own script and voice reference, with speaker tags and expressive cues supported by Drama 3.
+- **Generate a complete script in one pass.** Single-pass generation is the default; audio-history-conditioned text chunks remain optional.
+- **Make the most of available memory.** Automatic CPU/CUDA expert placement fits whole banks around the loaded model and caches, with a configurable free-VRAM reserve. Manual placement is available too.
+- **See what is happening.** Live operation stages, generation speed and actual CPU, RAM and GPU readings show progress and resource use.
+- **Keep the result and the recipe.** Play audio, download WAV or MP3, export project settings before generating, and import settings for another run. Inline help explains each control.
+
+<details>
+<summary><strong>See the generation monitor and loaded podcast</strong></summary>
+
+![Live generation stages, acoustic frame count, speed and generated duration](docs/assets/studio-progress.jpg)
+
+The monitor follows preparation, reference encoding, prefill, acoustic generation, decoding and export. Frame counts measure generated audio; they do not estimate how much script remains.
+
+![The Small Signal loaded in the actual studio, with live hardware graphs and generation settings](docs/assets/studio-podcast.jpg)
+
+</details>
+
+## Hear a complete podcast
+
+[![Play The Small Signal — 3:16 of one-pass narration](docs/assets/podcast-sample.svg)](https://huggingface.co/Eng-Ahmd/Drama-3-Windows-GGUF/resolve/main/demos/podcast-small-signal.mp3)
+
+[**The Small Signal · 3:16**](https://huggingface.co/Eng-Ahmd/Drama-3-Windows-GGUF#podcast--the-small-signal) is an original 592-word narration generated in **one request, without text chunks, retries or speech edits**. Load the included sample in the studio to try it yourself.
+
+[**Listen / download MP3**](https://huggingface.co/Eng-Ahmd/Drama-3-Windows-GGUF/resolve/main/demos/podcast-small-signal.mp3) · [**Lossless WAV**](https://huggingface.co/Eng-Ahmd/Drama-3-Windows-GGUF/resolve/main/demos/podcast-small-signal.wav) · [Full script](examples/samples/podcast.txt) · [Importable settings and provenance](https://huggingface.co/Eng-Ahmd/Drama-3-Windows-GGUF/resolve/main/demos/podcast-small-signal-settings.json)
+
+The untouched recording completed at 4216 frames and measured **0.34% ASR word error rate** (2 edits / 592 words), with no clipped samples. This is one checked example; automated transcription does not replace listening or establish general long-form quality.
+
+### More ways to shape a voice
+
+- [**Expressive tags**](https://huggingface.co/Eng-Ahmd/Drama-3-Windows-GGUF/resolve/main/demos/point-tags.wav) — spoken dialogue with sighs and laughter.
+- [**Contextual edit**](https://huggingface.co/Eng-Ahmd/Drama-3-Windows-GGUF/resolve/main/demos/contextual-edit.wav) — revise Wednesday to Thursday using the earlier take as context.
+- [**Chained edit**](https://huggingface.co/Eng-Ahmd/Drama-3-Windows-GGUF/resolve/main/demos/chained-edit.wav) — revise the deadline again while retaining earlier acoustic history.
+
+[Compare these recordings with the original Fish Audio demos](https://huggingface.co/Eng-Ahmd/Drama-3-Windows-GGUF#listen-original-vs-windows).
+
+## Start creating
+
+Follow the [installation guide](docs/public/INSTALL.md) to set up Windows prerequisites, Python, the **matching 0.2.0 native libraries**, and the model and codec bundles. Weights are downloaded separately; MP3 export requires FFmpeg with libmp3lame.
+
+Then launch the studio from your runtime environment:
 
 ```powershell
 python -m fish_drama3.webui
 ```
 
-Automatic placement keeps 3% of VRAM free after dense weights, request caches and a 256 MiB expert-workspace allowance. Manual placement supports 0–40 GPU expert layers; its initial value of 16 is not a fit guarantee. The continuous worker guard also preserves 8 GiB free host RAM. This is a memory budget, not a compute-utilization target.
+Open [http://127.0.0.1:7860](http://127.0.0.1:7860), select your model and codec paths, and load the model. Choose a sample or enter your text, optionally upload a voice reference with its transcript, and generate. Unload the model when finished to release its memory.
 
-Open [127.0.0.1:7860](http://127.0.0.1:7860). See the [web app guide](docs/public/WEB_UI.md) for model paths, controls and FFmpeg setup for MP3 export.
+The [studio guide](docs/public/WEB_UI.md) covers controls, project settings, output formats and live vitals. Prefer the terminal? The [user guide](docs/public/USER_GUIDE.md) covers the offline synthesis CLI and guarded runs.
 
-## Podcast example
+## Inside the runtime
 
-[**Listen to The Small Signal · 3:16**](https://huggingface.co/Eng-Ahmd/Drama-3-Windows-GGUF#podcast--the-small-signal): a complete [592-word podcast script](examples/samples/podcast.txt), generated in **one request without text chunks, retries or speech edits**. Load the sample in the studio to try it yourself.
+Drama 3 is a **35.9B MoE** speech model. This Windows port combines a PyTorch backbone and audio tower, native GGML CPU/CUDA routed experts, and a native reference encoder/audio decoder. The custom `fish_drama3` GGUF bundle requires this matching runtime.
 
-[WAV](https://huggingface.co/Eng-Ahmd/Drama-3-Windows-GGUF/resolve/main/demos/podcast-small-signal.wav) · [MP3](https://huggingface.co/Eng-Ahmd/Drama-3-Windows-GGUF/resolve/main/demos/podcast-small-signal.mp3) · [Importable settings and provenance](https://huggingface.co/Eng-Ahmd/Drama-3-Windows-GGUF/resolve/main/demos/podcast-small-signal-settings.json).
+Expert weights use **Q4_K**, the backbone **Q8_0**, sensitive vectors **F32**, and the audio tower **BF16**. Learned codec weights use F32, with BF16 RoPE tables. The model bundle is about **21.67 GiB**, plus **1.46 GiB** for the codec. The model bundles remain compatible with runtime 0.1.1 or newer; the current studio's automatic placement requires the 0.2.0 Python source and native bridge together.
 
-The recording ended normally at 4216 frames and measured 0.34% ASR WER (2 edits / 592 words), with no clipped samples. Prefill and generation took 520.00 seconds; CPU codec decoding added 223.34 seconds. These exclude model loading and MP3 export. This is one checked example; long-form output can still vary and automated transcription does not replace listening.
+[Model card](docs/public/MODEL_CARD.md) · [Quality and qualification](docs/public/QUALITY.md) · [Attribution](NOTICE.md)
 
-## Start here
+<details>
+<summary><strong>Measurements, memory and current limits</strong></summary>
 
-- [Installation](docs/public/INSTALL.md) covers the Windows toolchain, Python environment, pinned sources, conversion, and a first synthesis command.
-- [Browser app](docs/public/WEB_UI.md) covers local generation, sample loading, settings and audio export.
-- [User guide](docs/public/USER_GUIDE.md) describes conversion, voice references, output behavior, and guarded runs.
-- [Model card](docs/public/MODEL_CARD.md) documents the checkpoint, quantized bundle, measured results, and limitations.
-- [Quality and qualification](docs/public/QUALITY.md) records the current evidence and unresolved release gates.
-- [Attribution and licensing](NOTICE.md) explains the separate model, reference-code, and codec-donor terms.
+The podcast run used Windows 11, an RTX 5080 Laptop with 16 GiB VRAM, 128 GiB RAM and eight CPU threads. Automatic placement selected 15 GPU expert layers with a 3% VRAM reserve. Prefill and acoustic generation took **520.00 seconds**; CPU codec decoding added **223.34 seconds**, giving **743.34 seconds synthesis**, excluding model loading (27.26 seconds) and MP3 export. These are one-run measurements, not an aggregate benchmark.
 
-## Runtime at a glance
+Automatic placement defaults to 3% free VRAM, configurable from 1–25%, after dense weights, request caches and an additional 256 MiB expert-workspace allowance. This governs memory occupancy, not GPU compute utilization. Manual placement supports 0–40 GPU expert layers; its initial value of 16 is a requested count, not a fit guarantee. Continuous monitoring preserves the chosen VRAM reserve and 8 GiB free host RAM.
 
-The inference path keeps the backbone and audio tower in PyTorch, runs routed experts through native GGML CPU/CUDA libraries, and uses the native codec to encode reference audio and decode generated acoustic codes. The converter emits a custom `fish_drama3` GGUF architecture. It requires this matching runtime; generic llama.cpp does not provide Drama 3 support.
+The studio defaults to 6144 audio frames and supports up to 8192 within a 10,240-row prompt-plus-output limit. Reference audio consumes prompt rows too. A frame budget is not a completion percentage. Generation is stochastic and can omit or repeat words, stop early or pause; inspect each result. Incomplete output is rejected unless partial output is explicitly enabled.
 
-The speech model has 35.9B total parameters, matching the pinned upstream checkpoint. The separate codec is approximately 0.393B stored tensor elements. Quantization reduces storage precision, not parameter count.
+Targeted evidence includes all 850 checked reference codec codes matching, decode relative RMSE 1.74 × 10⁻⁶, four short English checks with zero ASR WER, and one Chinese plain-speech check with zero CER. A guarded two-hour repeated-request soak completed 713 speech requests and 143 validation recovery cycles. These checks do not establish broad acoustic quality, speaker similarity or production qualification. Clean-machine installation and broader coverage remain documented work; see the [quality report](docs/public/QUALITY.md).
 
-The conversion recipe stores expert weights as Q4_K, the backbone as Q8_0, sensitive vectors as F32, and the audio tower in BF16 and the learned codec weights in F32, preserving the codec RoPE tables in BF16. A complete model bundle is about 21.67 GiB and its codec is about 1.46 GiB. Conversion is direct from the pinned FP8/BF16 source without a full FP32 model intermediate.
+</details>
 
-## Current evidence and limits
+## Built with Fish Audio
 
-The native codec reproduced all 850 reference acoustic codes in the checked example. Decoding 87 frames produced the same 178,176 samples as the reference decode, with relative RMSE 1.74×10⁻⁶. One matched English voice-reference example had 0.0 Whisper WER for both the original and generated audio. A separate guarded CLI run completed at frame 169, producing 7.848 seconds of audio in 39 seconds; ASR recognized the requested words but inserted “Haha” (WER 0.0714). This is one sample, not a speech-quality or speed benchmark.
+Drama 3 materials retain the **Fish Audio Community License v1.0**. The s2.cpp-derived codec and its derivative work are separately governed by the **Fish Audio Research License**, which requires a separate written Fish Audio agreement for commercial use. GGML components retain the MIT license. See [NOTICE.md](NOTICE.md) and the [complete component terms](LICENSES/THIRD_PARTY_NOTICES.md).
 
-The CLI uses bounded text segments with the pinned model's audio-history conditioning by default. On the checked three-sentence passage, this completed all text in 14.12 seconds of audio and removed the unchunked run's long silent interval. Four short English checks had zero ASR WER; the checked Chinese plain example had zero CER. These are individual checks, with settings and limitations recorded in the [quality report](docs/public/QUALITY.md).
-
-Generation is stochastic: the recorded numbers prompt stalled at seed 124, while the default seed 123 completed both sentences. Frame limits fail without publishing incomplete audio unless explicitly requested. A guarded two-hour repeated-request soak passed with 713 successful speech requests and 143 validation recovery cycles. Larger acoustic holdouts, cancellation recovery, clean-machine installation and varied-content coverage remain documented work.
-
-## Licensing
-
-Built with Fish Audio. Drama 3 materials retain the Fish Audio Community License v1.0. The s2.cpp-derived codec and its derivative work are separately governed by the Fish Audio Research License, which requires a separate written Fish Audio agreement for commercial use. GGML components retain the MIT license. See [NOTICE.md](NOTICE.md) and the complete texts in [LICENSES](LICENSES/THIRD_PARTY_NOTICES.md).
-
-This repository does not grant rights to model weights, reference audio, or commercial use. Review all component terms before use or redistribution.
+This repository does not grant rights to model weights, reference audio or commercial use. Use voice references with the necessary rights and speaker consent, and review all component terms before use or redistribution.
