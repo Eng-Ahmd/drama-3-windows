@@ -1,6 +1,6 @@
 # Installation
 
-This guide installs or builds the Windows release `0.1.1` on Windows 11. The current environment has been exercised with Python 3.13, PyTorch 2.13.0+cu132, Visual Studio 2022, and CUDA Toolkit 13.3. A clean-machine installation has not yet been qualified.
+This guide installs or builds the Windows release `0.2.0` on Windows 11. The current environment has been exercised with Python 3.13, PyTorch 2.13.0+cu132, Visual Studio 2022, and CUDA Toolkit 13.3. A clean-machine installation has not yet been qualified.
 
 ## Prerequisites
 
@@ -14,7 +14,7 @@ This guide installs or builds the Windows release `0.1.1` on Windows 11. The cur
 
 ## Use the prebuilt Windows runtime
 
-The `fish-drama3-windows-runtime-0.1.1-win-x64.zip` release archive contains the tested CPU and CUDA runtime DLLs. Runtime 0.1.1 reuses these unchanged native libraries; update the Python source to 0.1.1 for chunked tokenizer metadata support. Extract it at the repository root so the files land under `builds/drama3-inspect/Release` and `builds/drama3-cuda/Release`; do not rename those directories. Check the included `SHA256SUMS.txt` against the extracted DLL and license files before use.
+The `fish-drama3-windows-runtime-0.2.0-win-x64.zip` release archive contains the tested CPU and CUDA runtime DLLs. Install the matching 0.2.0 Python source and native archive together. The studio needs the new CUDA bridge reserve-budget ABI for automatic placement; older native bridges do not provide it. Model bundles remain compatible with runtime 0.1.1 or newer. Extract it at the repository root so the files land under `builds/drama3-inspect/Release` and `builds/drama3-cuda/Release`; do not rename those directories. Check the included `SHA256SUMS.txt` against the extracted DLL and license files before use.
 
 Install the Microsoft Visual C++ 2015–2022 x64 Redistributable separately; it is not included. CUDA inference also requires an NVIDIA driver and CUDA Toolkit 13.3 or newer. NVIDIA and Microsoft DLLs are not redistributed in the archive. The Python environment and pinned Fish Speech reference checkout are still required; run `scripts/bootstrap.ps1` to fetch and verify source pins. The prebuilt archive avoids compiling the runtime libraries. The included CPU GGML library also provides the pinned quantizer for local conversion; a source build is optional when using this archive.
 
@@ -116,4 +116,18 @@ The CI job also runs watchdog logic tests but excludes the live NVIDIA sensor ch
 ## Licensing
 
 The runtime contains separately licensed model-related and codec-donor components. The s2.cpp-derived codec is subject to the Fish Audio Research License and requires a separate written agreement for commercial use. Review [NOTICE.md](../../NOTICE.md) and the component texts under [`LICENSES/`](../../LICENSES/THIRD_PARTY_NOTICES.md) before building or redistributing.
+
+
+## Use the browser app
+
+After completing installation, run `python -m fish_drama3.webui` (or `fish-drama3-web`) and open [http://127.0.0.1:7860](http://127.0.0.1:7860). The app loads the model once, exposes supported expert and sampling settings, and saves WAV or MP3 with a settings JSON. MP3 export needs FFmpeg on `PATH`. See the [browser app guide](WEB_UI.md) for model paths, sample loading, reference audio and exports.
+
+The podcast example loads the full script. The studio defaults to single-pass generation with 6144 audio frames and supports up to 8192, within a 10,240-row prompt-plus-output limit. Chunked generation is optional. A verified one-pass podcast example is linked in the browser app guide. This is one checked script; a completed request alone does not prove that every word was spoken. See the browser app guide for memory monitoring and output limits. These studio limits are separate from the CLI limits documented in the user guide.
+
+
+The studio defaults to **automatic expert placement** with **3% of total VRAM kept free**. It first loads the dense model and reserves request caches, then places as many complete expert banks as fit using measured free memory, with an additional 256 MiB workspace allowance. This targets memory occupancy, not GPU compute utilization; selecting more banks does not guarantee a utilization percentage or speedup. Whole-bank granularity can leave more than 3% free.
+
+Choose **Manual** to request 0–40 GPU expert layers; the manual field starts at 16. This is a requested count, not a claim that 16 layers fit every machine or request. Both modes enforce the chosen reserve. Continuous monitoring stops the worker below the 3% VRAM reserve or 8 GiB free host RAM.
+
+Automatic placement and the configurable native reserve require the **0.2.0 Python runtime and matching 0.2.0 native CUDA bridge**. Earlier DLLs do not export the required reserve-budget ABI. The model bundles themselves remain compatible with runtime 0.1.1 or newer.
 

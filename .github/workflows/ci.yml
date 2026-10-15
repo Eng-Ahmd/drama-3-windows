@@ -24,6 +24,6 @@ jobs:
         shell: pwsh
       - run: cmake -S upstream/s2.cpp -B builds/s2-cpu -G Ninja -DCMAKE_BUILD_TYPE=Release -DS2_AUTO_APPLY_LOCAL_PATCHES=OFF
       - run: cmake --build builds/s2-cpu --target ggml-base --parallel 1
-      - run: python -m pytest tests/test_cli.py tests/test_codec_adapter.py tests/test_direct.py tests/test_gguf_stream.py tests/test_hybrid.py tests/test_native_quant.py tests/test_qualification.py tests/test_watchdog.py tests/test_generation.py tests/test_text_chunks.py -k "not test_live_sensors_are_readable"
+      - run: python -m pytest tests/test_cli.py tests/test_codec_adapter.py tests/test_direct.py tests/test_gguf_stream.py tests/test_hybrid.py tests/test_native_quant.py tests/test_qualification.py tests/test_watchdog.py tests/test_generation.py tests/test_text_chunks.py tests/test_webui.py tests/test_web_worker.py tests/test_web_vitals.py -k "not test_live_sensors_are_readable"
         env:
           PYTHONPATH: .

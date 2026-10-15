@@ -1,5 +1,6 @@
 """Verify bounded generation, history conditioning and completion reporting."""
 from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 import torch
@@ -42,3 +43,36 @@ def test_history_budget_and_completion(monkeypatch, first_reason, budget, expect
         assert prompts[1][1][0][1].shape == (10, 2)
         assert prompts[1][1][0][1].dtype == torch.int64
         assert segments[1]["text"] == " Next."
+
+
+@pytest.mark.parametrize("prompt_rows,accepted", [(9728, True), (9729, False)])
+def test_context_limit_checked_before_generation(monkeypatch, prompt_rows, accepted):
+    prompt = torch.zeros((prompt_rows, 11), dtype=torch.long)
+    monkeypatch.setattr(generation, "build_drama3_prompt", Mock(return_value=prompt))
+    generate = Mock(return_value=(frames(1), "eos"))
+    monkeypatch.setattr(generation, "generate_drama3", generate)
+    args = SimpleNamespace(text="Hello.", chunk_length=0, max_frames=512,
+                           temperature=.7, top_p=.7, top_k=30, max_context_rows=10240)
+    model = SimpleNamespace(tokenizer=None, config=None)
+    if accepted:
+        result, reason, _ = generation.generate_text(model, args, [], [])
+        assert len(result) == 1 and reason == "eos"
+        assert generate.call_args.kwargs["max_new_tokens"] == 512
+    else:
+        with pytest.raises(ValueError, match="10240 context rows"):
+            generation.generate_text(model, args, [], [])
+        generate.assert_not_called()
+
+
+def test_context_limit_rechecks_history_conditioned_segment(monkeypatch):
+    monkeypatch.setattr(generation, "split_text", lambda *args: ["Hello.", "Again."])
+    prompts = [torch.zeros((3, 11), dtype=torch.long), torch.zeros((10000, 11), dtype=torch.long)]
+    monkeypatch.setattr(generation, "build_drama3_prompt", Mock(side_effect=prompts))
+    generate = Mock(return_value=(frames(1), "eos"))
+    monkeypatch.setattr(generation, "generate_drama3", generate)
+    args = SimpleNamespace(text="Hello. Again.", chunk_length=200, max_frames=512,
+                           temperature=.7, top_p=.7, top_k=30, max_context_rows=10240)
+    model = SimpleNamespace(tokenizer=None, config=None)
+    with pytest.raises(ValueError, match="10240 context rows"):
+        generation.generate_text(model, args, [], [])
+    generate.assert_called_once()

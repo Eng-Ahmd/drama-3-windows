@@ -97,6 +97,22 @@ python -m fish_drama3.watchdog --output runs/demo-watchdog -- python -m examples
 
 </details>
 
+## Podcast · The Small Signal
+
+**A complete 592-word podcast in one generation request.** This 3 minute 16 second recording uses the full script at once: no text chunks, retries, selected takes or speech edits.
+
+<audio controls preload="metadata" style="width:100%;max-width:100%;"><source src="https://huggingface.co/Eng-Ahmd/Drama-3-Windows-GGUF/resolve/main/demos/podcast-small-signal.mp3" type="audio/mpeg"></audio>
+
+[WAV](https://huggingface.co/Eng-Ahmd/Drama-3-Windows-GGUF/resolve/main/demos/podcast-small-signal.wav) · [MP3](https://huggingface.co/Eng-Ahmd/Drama-3-Windows-GGUF/resolve/main/demos/podcast-small-signal.mp3) · [Full script](https://huggingface.co/Eng-Ahmd/Drama-3-Windows-GGUF/blob/main/demos/podcast-small-signal.txt) · [Importable settings and provenance](https://huggingface.co/Eng-Ahmd/Drama-3-Windows-GGUF/resolve/main/demos/podcast-small-signal-settings.json) · [Quality checks](https://huggingface.co/Eng-Ahmd/Drama-3-Windows-GGUF/blob/main/demos/podcast-small-signal-quality.json)
+
+Generated through the 0.2.0 browser studio with the **en0** reference above, seed 123, temperature 0.7, top-p 0.7, top-k 30 and a 6144-frame budget. Automatic placement selected **15 GPU expert layers** with a 3% VRAM reserve; the cache context was 10,240 rows. The model ended normally at **4216 frames / 195.79 seconds**. The codec decoded the continuous acoustic stream in bounded context windows (1792 frames plus 256 context), without editing speech.
+
+On Windows 11 with an RTX 5080 Laptop (16 GiB VRAM), 128 GiB RAM and 8 CPU threads, acoustic generation including prefill took **520.00 seconds**; CPU codec decoding added **223.34 seconds**, for **743.34 seconds synthesis**. These exclude model loading (**27.26 seconds**) and MP3 export. This is one recorded run, not an aggregate speed benchmark.
+
+The untouched WAV has **0.34% ASR WER** (2 edits / 592 reference words), no full-scale clipped samples, peak magnitude 0.54089 and a longest measured near-silent interval of 0.06 seconds. Automated transcription is approximate and does not replace listening or measure speaker similarity. This single example establishes that this full script completed in one request; other text, seeds and environments can still omit or repeat words, stop early or pause.
+
+To try it, load **The Small Signal** in the studio, upload the shared **en0** reference and import the linked settings. Public settings use standard download paths; adjust them for your installation. Automatic expert placement and seeded output can differ with available memory, hardware and runtime.
+
 ## Model & runtime
 
 | Component | Configuration |
@@ -125,7 +141,11 @@ Windows 11 · RTX 5080 Laptop, 16 GiB VRAM · 128 GiB RAM · 12 GPU expert layer
 RTF is synthesis time divided by audio length. Timings include model prefill, generation and native codec decode; they exclude one-time model loading, reference encoding and file writing. Model loading took 23.04 seconds for this run.
 
 
-Generation is offline. The watchdog reserves at least 1 GiB GPU memory and 8 GiB host RAM; expert placement is configurable. Prebuilt CUDA libraries target SM120. The documented environment uses Python 3.13, PyTorch 2.13.0+cu132, CUDA Toolkit 13.3 and the Visual C++ x64 runtime.
+Generation is offline. The external CLI watchdog reserves at least 1 GiB GPU memory and 8 GiB host RAM; expert placement is configurable. Prebuilt CUDA libraries target SM120. The documented environment uses Python 3.13, PyTorch 2.13.0+cu132, CUDA Toolkit 13.3 and the Visual C++ x64 runtime.
+
+## Browser generation app
+
+The [local web app](https://github.com/Eng-Ahmd/drama-3-windows/blob/main/docs/public/WEB_UI.md) lets you load and unload the model, load the full podcast script, customize supported generation and expert-placement settings, play results and save WAV or MP3 with a settings JSON. Single pass is the default; chunked generation is optional. The studio starts with a 6144-frame budget and supports up to 8192 frames within a 10,240-row prompt-plus-output context limit. The studio requires the 0.2.0 Python runtime and matching native bridge. Automatic placement loads dense weights and request caches first, then fits complete expert banks against actual free memory with a 256 MiB workspace allowance and 3% total VRAM reserve. Manual mode supports 0–40 layers, initially 16; fit depends on hardware and request size. Continuous monitoring preserves 3% free VRAM and 8 GiB free host RAM. The percentage governs memory occupancy, not compute utilization. MP3 export requires FFmpeg. After installing the current runtime source, start it with `python -m fish_drama3.webui`, then open `http://127.0.0.1:7860`.
 
 ## Download & run
 

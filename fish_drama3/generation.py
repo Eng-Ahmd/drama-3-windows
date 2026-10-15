@@ -29,6 +29,10 @@ def generate_text(model: Any, args: argparse.Namespace, texts: list[str],
             rendered = speaker + " " + chunk
         prompt = build_drama3_prompt(rendered, model.tokenizer, model.config,
                                     texts, codes, history=history)
+        context_limit = getattr(args, "max_context_rows", None)
+        if context_limit is not None and len(prompt) + remaining > context_limit:
+            raise ValueError("Prompt plus audio frame budget exceeds 10240 context rows; "
+                             "reduce maximum frames or script/reference length")
         frames, reason = generate_drama3(model, prompt, max_new_tokens=remaining,
             temperature=args.temperature, top_p=args.top_p, top_k=args.top_k)
         if len(frames) == 0:

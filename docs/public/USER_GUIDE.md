@@ -2,6 +2,18 @@
 
 Fish Drama 3 for Windows is an offline synthesis runtime. It combines PyTorch execution for the backbone and audio tower with native GGML expert kernels and a native codec. The current build is not a generic llama.cpp model and does not provide a standalone C++ execution path.
 
+## Use the browser app
+
+After completing installation, run `python -m fish_drama3.webui` (or `fish-drama3-web`) and open [http://127.0.0.1:7860](http://127.0.0.1:7860). The app loads the model once, exposes supported expert and sampling settings, and saves WAV or MP3 with a settings JSON. MP3 export needs FFmpeg on `PATH`. See the [browser app guide](WEB_UI.md) for model paths, sample loading, reference audio and exports.
+
+The podcast example loads the full script. The studio defaults to single-pass generation with 6144 audio frames and supports up to 8192, within a 10,240-row prompt-plus-output limit. Chunked generation is optional. A verified one-pass podcast example is linked in the browser app guide. This is one checked script; a completed request alone does not prove that every word was spoken. See the browser app guide for memory monitoring and output limits. These studio limits are separate from the CLI limits below.
+
+The studio defaults to **automatic expert placement** with **3% of total VRAM kept free**. It first loads the dense model and reserves request caches, then places as many complete expert banks as fit using measured free memory, with an additional 256 MiB workspace allowance. This targets memory occupancy, not GPU compute utilization; selecting more banks does not guarantee a utilization percentage or speedup. Whole-bank granularity can leave more than 3% free.
+
+Choose **Manual** to request 0–40 GPU expert layers; the manual field starts at 16. This is a requested count, not a claim that 16 layers fit every machine or request. Both modes enforce the chosen reserve. Continuous monitoring stops the worker below the 3% VRAM reserve or 8 GiB free host RAM.
+
+Automatic placement and the configurable native reserve require the **0.2.0 Python runtime and matching 0.2.0 native CUDA bridge**. Earlier DLLs do not export the required reserve-budget ABI. The model bundles themselves remain compatible with runtime 0.1.1 or newer.
+
 ## Generate speech
 
 After [installation](INSTALL.md) and conversion, use a new output path for each run:

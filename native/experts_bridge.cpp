@@ -207,7 +207,7 @@ ggml_tensor * build_graph(ggml_context * context, std::map<std::string, ggml_ten
 }
 
 #ifdef DRAMA3_CUDA
-void cuda_weights(Model & model, int device, int count) {
+void cuda_weights(Model & model, int device, int count, uint64_t reserve_bytes) {
     if (device < 0 || device >= ggml_backend_cuda_get_device_count() || count < 1 ||
         count > static_cast<int>(model.banks.size())) throw std::runtime_error("invalid CUDA device/layer count");
     model.cuda = ggml_backend_cuda_init(device);
@@ -225,9 +225,11 @@ void cuda_weights(Model & model, int device, int count) {
     }
     size_t available = 0, total = 0;
     ggml_backend_cuda_get_device_memory(device, &available, &total);
-    constexpr uint64_t reserve = 1024ULL * 1024 * 1024;
-    if (required > available || reserve > available - required) {
-        throw std::runtime_error("CUDA weights would leave less than 1 GiB free; reduce GPU layers");
+    if (reserve_bytes == 0 || reserve_bytes > total) {
+        throw std::runtime_error("invalid CUDA memory reserve");
+    }
+    if (required > available || reserve_bytes > available - required) {
+        throw std::runtime_error("CUDA weights would breach the requested free-memory reserve; reduce GPU layers");
     }
     model.gpu_weights = ggml_backend_alloc_ctx_tensors(model.gpu_context.get(), model.cuda);
     if (!model.gpu_weights) throw std::runtime_error("CUDA weight allocation failed");
@@ -359,7 +361,26 @@ extern "C" __declspec(dllexport) void * drama3_open_cuda(const char * path, int 
         map_file(*model, path);
         load_descriptors(*model, path);
         collect_banks(*model);
-        cuda_weights(*model, device, gpu_layer_count);
+        cuda_weights(*model, device, gpu_layer_count, 1024ULL * 1024 * 1024);
+        error_text(err, capacity, "");
+        return model.release();
+    } catch (const std::exception & error) {
+        error_text(err, capacity, error.what());
+    } catch (...) {
+        error_text(err, capacity, "unknown CUDA open failure");
+    }
+    return nullptr;
+}
+
+extern "C" __declspec(dllexport) void * drama3_open_cuda_budget(const char * path, int device,
+    int gpu_layer_count, uint64_t reserve_bytes, char * err, size_t capacity) {
+    try {
+        if (reserve_bytes == 0) throw std::runtime_error("invalid CUDA memory reserve");
+        auto model = std::make_unique<Model>();
+        map_file(*model, path);
+        load_descriptors(*model, path);
+        collect_banks(*model);
+        cuda_weights(*model, device, gpu_layer_count, reserve_bytes);
         error_text(err, capacity, "");
         return model.release();
     } catch (const std::exception & error) {

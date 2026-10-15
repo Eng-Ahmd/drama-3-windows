@@ -2,6 +2,7 @@
 from collections.abc import Iterator
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import Mock
 
 import gguf
 import numpy as np
@@ -9,6 +10,7 @@ import pytest
 import torch
 
 from fish_drama3.hybrid import ExpertBridge, NativeExperts, check_gpu_budget, copy_parameter
+import fish_drama3.hybrid as hybrid
 
 ROOT = Path(__file__).resolve().parents[1]
 MODEL = ROOT / "models/drama3-direct-layer4/model.gguf"
@@ -134,3 +136,132 @@ def test_bridge_rejects_unsafe_buffers(bridge: ExpertBridge, bad_buffer: str) ->
         ids = ids.float()
     with pytest.raises(ValueError):
         bridge.forward(4, values, ids, mixing)
+
+
+def test_auto_planner_uses_actual_tail_sizes_and_percentage() -> None:
+    unit = 2**20
+    sizes = [100 * unit, 300 * unit, 200 * unit]
+    plan = hybrid.plan_gpu_layers(sizes, 900 * unit, 1000 * unit, 3)
+    assert plan["headroom_bytes"] == 30 * unit
+    assert plan["workspace_reserve_bytes"] == 256 * unit
+    assert plan["gpu_expert_layers"] == 3
+    assert plan["expert_bytes"] == 600 * unit
+    plan = hybrid.plan_gpu_layers(sizes, 600 * unit, 1000 * unit, 3)
+    assert plan["gpu_expert_layers"] == 1 and plan["expert_bytes"] == 200 * unit
+    with pytest.raises(RuntimeError, match="headroom/workspace"):
+        hybrid.plan_gpu_layers(sizes, 200 * unit, 1000 * unit, 3)
+
+
+def test_expert_sizes_count_only_quantized_bank_payloads(monkeypatch) -> None:
+    tensors = [SimpleNamespace(name=name, data=SimpleNamespace(nbytes=size)) for name, size in [
+        ("model.layers.39.mlp.experts_bank.gate_proj.weight", 12),
+        ("model.layers.39.mlp.experts_bank.up_proj.weight", 24),
+        ("model.layers.0.mlp.experts_bank.down_proj.weight", 48),
+        ("model.layers.39.attn.q_proj.weight", 999)]]
+    monkeypatch.setattr(hybrid, "GGUFReader", lambda path: SimpleNamespace(tensors=tensors))
+    sizes = hybrid.expert_layer_bytes(Path("model"))
+    assert len(sizes) == 40 and sizes[39] == 36 and sizes[0] == 48
+    assert sum(sizes) == 84
+
+
+def fake_auto_model():
+    layers = [SimpleNamespace(mlp=SimpleNamespace(experts=object())) for _ in range(40)]
+    return SimpleNamespace(backbone=SimpleNamespace(model=SimpleNamespace(layers=layers)))
+
+
+def test_auto_allocation_retries_and_rebinds_owned_bridge(monkeypatch) -> None:
+    model, old, replacement = fake_auto_model(), Mock(), Mock()
+    constructor = Mock(side_effect=[RuntimeError("GPU allocation failed"), replacement])
+    monkeypatch.setattr(hybrid, "ExpertBridge", constructor)
+    empty = Mock()
+    monkeypatch.setattr(torch.cuda, "empty_cache", empty)
+    placement = dict(gpu_expert_layers=3, headroom_bytes=512)
+    result = hybrid.allocate_auto_experts(Path("model"), model, old, 8, placement, [10] * 40)
+    assert result is replacement and placement["gpu_expert_layers"] == 2
+    assert [call.args[2] for call in constructor.call_args_list] == [3, 2]
+    assert constructor.call_args.kwargs["headroom_bytes"] == 512
+    assert all(layer.mlp.experts.bridge is replacement for layer in model.backbone.model.layers)
+    old.close.assert_called_once()
+    replacement.close.assert_not_called()
+    empty.assert_called_once()
+
+
+def test_manual_allocation_failure_never_changes_requested_layers(monkeypatch) -> None:
+    old = Mock()
+    constructor = Mock(side_effect=RuntimeError("GPU allocation failed"))
+    monkeypatch.setattr(hybrid, "ExpertBridge", constructor)
+    with pytest.raises(RuntimeError, match="allocation failed"):
+        hybrid.allocate_auto_experts(Path("model"), fake_auto_model(), old, 8,
+                                     dict(gpu_expert_layers=16, headroom_bytes=512), [1] * 40,
+                                     automatic=False)
+    constructor.assert_called_once()
+    old.close.assert_not_called()
+
+
+def test_allocation_falls_back_to_existing_cpu_bridge(monkeypatch) -> None:
+    old = Mock()
+    monkeypatch.setattr(hybrid, "ExpertBridge", Mock(side_effect=RuntimeError("No VRAM")))
+    monkeypatch.setattr(torch.cuda, "empty_cache", Mock())
+    placement = dict(gpu_expert_layers=2, headroom_bytes=512)
+    result = hybrid.allocate_auto_experts(Path("model"), fake_auto_model(), old, 8,
+                                          placement, [1] * 40)
+    assert result is old and placement["gpu_expert_layers"] == 0
+    old.close.assert_not_called()
+
+
+@pytest.mark.parametrize("manual", [None, 0, 16])
+def test_staged_loading_plans_after_dense_weights_and_caches(monkeypatch, manual) -> None:
+    model, old, replacement = fake_auto_model(), Mock(), Mock()
+    sequence = []
+    monkeypatch.setattr(hybrid, "load_model", lambda *args, **kwargs: (
+        sequence.append(("dense", kwargs)) or (model, old)))
+    monkeypatch.setattr(hybrid, "ensure_drama3_caches", lambda value, capacity: sequence.append(("cache", capacity)))
+    monkeypatch.setattr(torch.cuda, "synchronize", lambda device: sequence.append(("sync", device)))
+    monkeypatch.setattr(torch.cuda, "empty_cache", lambda: None)
+    monkeypatch.setattr(torch.cuda, "mem_get_info", lambda device: (8 * 2**30, 16 * 2**30))
+    monkeypatch.setattr(hybrid, "expert_layer_bytes", lambda bundle: [100 * 2**20] * 40)
+    monkeypatch.setattr(hybrid, "ExpertBridge", Mock(return_value=replacement))
+    _, bridge, placement = hybrid.load_model_placed(Path("model"), gpu_layers=manual)
+    assert sequence[0] == ("dense", dict(threads=8, gpu_layers=0))
+    assert sequence[1] == ("cache", 10240)
+    assert placement["gpu_expert_layers"] == (40 if manual is None else manual)
+    assert bridge is (old if manual == 0 else replacement)
+    assert placement["headroom_bytes"] == int(np.ceil(16 * 2**30 * .03))
+    assert placement["placement_mode"] == ("auto" if manual is None else "manual")
+
+
+def test_manual_overbudget_closes_initial_cpu_bridge(monkeypatch) -> None:
+    old = Mock()
+    monkeypatch.setattr(hybrid, "load_model", lambda *args, **kwargs: (fake_auto_model(), old))
+    monkeypatch.setattr(hybrid, "ensure_drama3_caches", Mock())
+    monkeypatch.setattr(torch.cuda, "synchronize", Mock())
+    monkeypatch.setattr(torch.cuda, "empty_cache", Mock())
+    monkeypatch.setattr(torch.cuda, "mem_get_info", lambda device: (1024 * 2**20, 16 * 2**30))
+    monkeypatch.setattr(hybrid, "expert_layer_bytes", lambda bundle: [100 * 2**20] * 40)
+    with pytest.raises(ValueError, match="Requested GPU"):
+        hybrid.load_model_placed(Path("model"), gpu_layers=16)
+    old.close.assert_called_once()
+
+
+def test_budget_native_abi_preserves_legacy_entry_point() -> None:
+    bridge = object.__new__(ExpertBridge)
+    budget, legacy = Mock(return_value=123), Mock(return_value=456)
+    bridge.library = SimpleNamespace(drama3_open_cuda_budget=budget, drama3_open_cuda=legacy)
+    import ctypes
+    error = ctypes.create_string_buffer(1024)
+    assert bridge.open_cuda(Path("model.gguf"), 16, 512, error) == 123
+    assert budget.call_args.args[3] == 512
+    assert budget.argtypes[3] is ctypes.c_uint64
+    assert bridge.open_cuda(Path("model.gguf"), 16, None, error) == 456
+    assert len(legacy.call_args.args) == 5
+
+
+def test_missing_budget_abi_is_not_silently_retried_as_allocation_failure(monkeypatch):
+    old = Mock()
+    constructor = Mock(side_effect=ValueError("Auto placement requires updated Windows native libraries"))
+    monkeypatch.setattr(hybrid, "ExpertBridge", constructor)
+    with pytest.raises(ValueError, match="updated Windows native libraries"):
+        hybrid.allocate_auto_experts(Path("model"), fake_auto_model(), old, 8,
+                                     dict(gpu_expert_layers=16, headroom_bytes=512), [1] * 40)
+    constructor.assert_called_once()
+    old.close.assert_not_called()
