@@ -129,6 +129,43 @@ def test_generate_uses_registered_reference_and_unique_output(studio):
         studio.generate(dict(text="Again"))
 
 
+def test_budget_risk_blocks_before_sending_or_creating_job(studio):
+    studio.worker = fake_worker()
+    studio.state.update(status="ready", model=dict(MODEL))
+    data = dict(text="word " * 500, max_frames=512)
+    assert studio.plan(data)["risk"] == "high"
+    with pytest.raises(ValueError, match="Frame budget risk"):
+        studio.generate(data)
+    assert studio.worker.stdin.getvalue() == ""
+    assert studio.pending is None
+    assert not list(studio.output.iterdir())
+    studio.generate(dict(data, plan_acknowledged=True))
+    assert json.loads(studio.worker.stdin.getvalue())["text"] == data["text"]
+
+
+def test_plan_http_does_not_need_loaded_model(server):
+    payload = json.dumps(dict(text="Hello.", max_frames=6144))
+    status, _, response = http(server, "/api/plan", "POST", payload,
+                               {"Content-Type": "application/json"})
+    plan = json.loads(response)
+    assert status == 202 and plan["segments"] == 1 and plan["risk"] == "low"
+
+
+def test_segment_progress_preserves_total_frames_and_decode_counts(studio):
+    events = ('DRAMA3_EVENT{"progress":{"completed_frames":200,"segment_index":2}}\n'
+              ' 12%|...| 71/512 [00:12<01:30, 12.34it/s]\n'
+              'DRAMA3_EVENT{"phase":"decoding",'
+              '"progress":{"stage_completed":1,"stage_total":3}}\n')
+    process = fake_worker(events)
+    studio.worker = process
+    studio.pending = {"max_frames":6144}
+    studio.state.update(status="generating")
+    studio.read_worker(process)
+    progress = studio.state["progress"]
+    assert progress["frames"] == 271 and progress["budget"] == 6144
+    assert progress["stage_completed"] == 1 and progress["stage_total"] == 3
+
+
 def test_publication_saves_settings_and_confines_worker_output(studio):
     studio.worker = fake_worker()
     studio.state.update(status="ready", model=dict(MODEL))
@@ -358,7 +395,8 @@ def test_reader_extracts_native_frame_progress(studio):
     studio.worker = process
     studio.state.update(status="generating", message="Generating speech…")
     studio.read_worker(process)
-    assert studio.state["progress"] == dict(frames=711, budget=6144, frames_per_second=12.34)
+    assert studio.state["progress"] == dict(frames=711, segment_frames=711,
+                                            budget=6144, frames_per_second=12.34)
     assert studio.state["phase"] == "generating"
 
 

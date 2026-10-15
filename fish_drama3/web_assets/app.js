@@ -17,6 +17,10 @@ let uiRevision = null;
 let telemetryUpdatedAt = null;
 let telemetryReceivedAt = null;
 let transientRestore = null;
+let generationPlan = null;
+let planTimer = null;
+let planVersion = 0;
+let planning = false;
 const telemetryHistory = {cpu: [], ram: [], gpu: [], vram: []};
 const transientKey = 'fish-drama3.transient.v1';
 
@@ -122,6 +126,68 @@ function renderTransport() {
   $('generation-speed').textContent = running && Number.isFinite(state.progress?.frames_per_second) ? `${state.progress.frames_per_second.toFixed(1)} fps` : !running && Number.isFinite(metrics.frames) && metrics.generation_seconds > 0 ? `${(metrics.frames / metrics.generation_seconds).toFixed(1)} fps` : '—';
   $('produced-audio').textContent = Number.isFinite(frames) ? formatSeconds(frames * 2048 / 44100) : '—';
   $('elapsed').textContent = active && state.started_at ? `${formatSeconds(Math.max(0, Date.now() / 1000 - state.started_at))} elapsed` : metrics.synthesis_seconds ? `${formatSeconds(metrics.synthesis_seconds)} total` : '—';
+  renderSpeechProgress();
+  renderExpertPerformance();
+}
+
+function renderExpertPerformance() {
+  const element = $('expert-performance');
+  const profile = state.performance || state.result?.metrics?.expert_profile;
+  const cpu = profile?.backends?.cpu;
+  const gpu = profile?.backends?.gpu;
+  const available = profile?.enabled && (cpu || gpu);
+  element.hidden = !available;
+  if (!available) return;
+  const cpuSeconds = cpu?.wall_seconds || 0;
+  const gpuSeconds = gpu?.wall_seconds || 0;
+  const staging = (cpu?.host_staging_seconds || 0) + (gpu?.host_staging_seconds || 0);
+  element.textContent = `Measured expert bridge · CPU ${cpuSeconds.toFixed(1)}s · GPU ${gpuSeconds.toFixed(1)}s · host staging / waits ${staging.toFixed(1)}s`;
+  element.title = 'Cumulative blocking expert-call time for this request, including prefill. Host staging and waits are included in the CPU/GPU totals, not extra time. Backbone, audio tower and codec time are separate.';
+}
+
+function renderSpeechProgress() {
+  const progress = state.progress || {};
+  const metrics = state.result?.metrics || {};
+  const running = state.status === 'generating';
+  let percent = null;
+  let label = 'Estimated speech progress';
+  let detail = 'Speech length is estimated. Frame budget usage is separate.';
+  if (running && state.phase === 'decoding' && progress.stage_total > 0 && Number.isFinite(progress.stage_completed)) {
+    percent = Math.min(100, progress.stage_completed / progress.stage_total * 100);
+    label = 'Audio decode progress';
+    detail = `${progress.stage_completed} / ${progress.stage_total} codec windows · CPU waveform decoding`;
+  } else if (running && state.phase === 'generating') {
+    const estimatedFrames = progress.estimated_frames || state.plan?.estimated_frames || generationPlan?.estimated_frames;
+    if (estimatedFrames > 0 && Number.isFinite(progress.frames)) percent = progress.frames / estimatedFrames * 100;
+    const segmentCharacters = progress.segment_characters ?? generationPlan?.chunks?.[progress.segment_index - 1]?.characters;
+    if (progress.total_characters > 0 && progress.segment_estimated_frames > 0 && Number.isFinite(segmentCharacters)) {
+      const segmentRatio = progress.segment_complete ? 0 : Math.max(0, Math.min(1, (progress.segment_frames || 0) / progress.segment_estimated_frames));
+      percent = ((progress.completed_characters || 0) + segmentRatio * segmentCharacters) / progress.total_characters * 100;
+    }
+    if (percent !== null) percent = Math.max(0, Math.min(99, percent));
+    detail = progress.segment_count > 1 ? `Passage ${progress.segment_index || 1} / ${progress.segment_count} · completed passages plus estimated current speech` : 'Estimated from acoustic frames and expected speech length. It can reach 99% before speech ends.';
+  } else if (!['loading', 'generating', 'unloading'].includes(state.status) && state.result && metrics.complete === true) {
+    percent = 100;
+    label = 'Generation complete';
+    detail = 'The model emitted its end token and the recording was saved. Listen to verify the words.';
+  } else if (running) {
+    label = state.phase === 'decoding' ? 'Decoding audio' : state.phase === 'exporting' ? 'Exporting recording' : 'Preparing speech';
+    detail = 'This stage does not report a measurable completion percentage.';
+  } else if (metrics.complete === false && state.result) {
+    label = 'Incomplete recording';
+    detail = 'The frame limit was reached before the model finished.';
+  }
+  $('speech-progress-label').textContent = label;
+  $('speech-progress-detail').textContent = detail;
+  $('speech-percent').textContent = percent === null ? '—' : `${Math.floor(percent)}%`;
+  $('speech-progress-fill').style.width = percent === null ? '0%' : `${percent}%`;
+  $('speech-meter').classList.toggle('indeterminate', running && percent === null);
+  $('speech-meter').setAttribute('aria-label', label);
+  if (percent === null) $('speech-meter').removeAttribute('aria-valuenow');
+  else $('speech-meter').setAttribute('aria-valuenow', String(Math.floor(percent)));
+  const frames = running ? progress.frames : metrics.frames;
+  const budget = running ? progress.budget : metrics.max_frames;
+  $('frame-budget-used').textContent = Number.isFinite(frames) && budget > 0 ? `Frame budget used ${(frames / budget * 100).toFixed(1)}% (${frames.toLocaleString()} / ${budget.toLocaleString()})` : 'Frame budget used —';
 }
 
 function values(keys) {
@@ -141,6 +207,7 @@ function applySettings(settings) {
     else $(key).value = settings[key];
   }
   updateCount();
+  schedulePlan();
 }
 
 function updateCount() {
@@ -157,7 +224,11 @@ async function request(url, body, options = {}) {
     method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body), ...options,
   });
   const data = await response.json();
-  if (!response.ok) throw new Error(data.error || data.message || `Request failed (${response.status})`);
+  if (!response.ok) {
+    const error = new Error(data.error || data.message || `Request failed (${response.status})`);
+    error.status = response.status;
+    throw error;
+  }
   return data;
 }
 
@@ -201,7 +272,7 @@ function renderResult(result) {
 }
 
 function render() {
-  const busy = !connected || pending || uploading || ['loading', 'generating', 'unloading'].includes(state.status);
+  const busy = !connected || pending || planning || uploading || ['loading', 'generating', 'unloading'].includes(state.status);
   if (state.model) {
     for (const key of modelKeys) {
       if (Object.hasOwn(state.model, key)) $(key).value = state.model[key];
@@ -223,10 +294,13 @@ function render() {
   $('cancel').disabled = pending || !connected;
   for (const key of settingsKeys) $(key).disabled = busy || (modelKeys.includes(key) && state.status === 'ready');
   for (const id of ['examples', 'reference', 'load-sample-reference', 'clear-reference', 'save-settings', 'import-settings', 'reset-settings']) $(id).disabled = busy;
+  for (const id of ['use-smart-segments', 'retry-smart-segments', 'risk-acknowledged']) $(id).disabled = busy;
+  $('failure-guidance').hidden = !(state.error || (state.status === 'error' && state.message));
   $('clear-reference').hidden = !referenceId;
   $('output_format').querySelector('[value="mp3"]').disabled = !state.mp3_available;
   $('mp3_bitrate').disabled = busy || !state.mp3_available || $('output_format').value !== 'mp3';
   $('chunk_length').disabled = busy || $('generation_mode').value === 'single';
+  $('max_frames').max = $('generation_mode').value === 'single' ? '8192' : '65536';
   const automatic = $('placement_mode').value === 'auto';
   $('gpu_expert_layers').disabled = busy || state.status === 'ready' || automatic;
   $('headroom_percent').disabled = busy || state.status === 'ready';
@@ -252,6 +326,68 @@ function render() {
   renderResult(state.result);
   renderVitals();
   renderTransport();
+}
+
+function localPlan(settings, reason) {
+  const words = settings.text.trim().split(/\s+/).filter(Boolean).length;
+  const frames = Math.ceil(words / 2.7 * 44100 / 2048);
+  const single = settings.generation_mode === 'single';
+  const high = (single && words > 150) || frames > settings.max_frames * 0.9;
+  return {mode: settings.generation_mode, words, characters: settings.text.length, segments: single ? 1 : Math.max(1, Math.ceil(settings.text.length / Math.max(32, settings.chunk_length || 200))), estimated_frames: frames, estimated_seconds: frames * 2048 / 44100, max_frames: settings.max_frames, budget_seconds: settings.max_frames * 2048 / 44100, recommended_chunked_frames: Math.min(65536, Math.max(512, Math.ceil(frames * 1.3))), risk: high ? 'high' : words > 80 ? 'warning' : 'low', warnings: [reason, ...(single && words > 150 ? ['A long single pass can omit or repeat words, stop early, or produce long pauses. Smart segments are recommended.'] : []), ...(frames > settings.max_frames * 0.9 ? ['The estimated speech is close to or beyond the total frame budget. Consider a larger budget or a shorter script.'] : [])], local: true};
+}
+
+function renderPlan(plan) {
+  $('plan-card').hidden = !plan;
+  if (!plan) return;
+  $('plan-card').dataset.risk = plan.risk;
+  $('plan-risk').textContent = plan.risk === 'high' ? 'HIGH RISK' : plan.risk === 'warning' ? 'REVIEW REQUEST' : 'READY TO REVIEW';
+  $('plan-summary').textContent = `${plan.words.toLocaleString()} words · ${plan.segments} ${plan.segments === 1 ? 'passage' : 'passages'} · approximately ${formatSeconds(plan.estimated_seconds)} of speech · ${formatSeconds(plan.budget_seconds)} total frame allowance`;
+  $('plan-warnings').replaceChildren();
+  for (const warning of plan.warnings || []) {
+    const item = document.createElement('li');
+    item.textContent = warning;
+    $('plan-warnings').append(item);
+  }
+  $('plan-source').textContent = plan.local ? 'Local estimate · runtime planner unavailable' : 'Runtime preflight · speech length is estimated';
+  $('risk-ack-label').hidden = plan.risk !== 'high';
+  $('use-smart-segments').hidden = plan.mode === 'chunked' && plan.risk === 'low';
+}
+
+async function refreshPlan() {
+  const version = ++planVersion;
+  const settings = {...values(generationKeys), text: $('text').value, reference_text: $('reference_text').value, reference_id: referenceId};
+  if (settings.generation_mode === 'single') settings.chunk_length = 0;
+  if (!settings.text.trim()) { generationPlan = null; renderPlan(null); return null; }
+  let plan;
+  try { plan = await request('/api/plan', settings, {signal: AbortSignal.timeout(10000)}); }
+  catch (error) {
+    const message = error.status === 400 ? error.message : error.status === 404 ? 'Restart the runtime to enable its request planner. This is a rough local estimate.' : 'Runtime planning is unavailable. This is a rough local estimate; reconnect before generating.';
+    plan = localPlan(settings, message);
+    plan.invalid = true;
+    plan.risk = 'high';
+  }
+  if (version !== planVersion) return null;
+  generationPlan = plan;
+  renderPlan(plan);
+  return plan;
+}
+
+function schedulePlan() {
+  clearTimeout(planTimer);
+  $('risk-acknowledged').checked = false;
+  planTimer = setTimeout(refreshPlan, 400);
+}
+
+function useSmartSegments() {
+  $('generation_mode').value = 'chunked';
+  const passageLength = generationPlan?.recommended_chunk_length || Math.min(2000, Math.max(200, Math.ceil($('text').value.length / 24)));
+  $('chunk_length').value = passageLength;
+  const recommended = numeric(generationPlan?.recommended_chunked_frames);
+  if (recommended !== null) $('max_frames').value = Math.min(65536, Math.max(Number($('max_frames').value), recommended));
+  $('risk-acknowledged').checked = false;
+  $('settings-message').textContent = `Smart segments selected: up to ${passageLength} characters per passage at smart boundaries, with ${Number($('max_frames').value).toLocaleString()} total frames. Your script, reference and sampling settings are retained.`;
+  render();
+  refreshPlan();
 }
 
 async function action(url, body) {
@@ -324,7 +460,7 @@ $('generate-form').addEventListener('invalid', (event) => {
   const details = event.target.closest('details');
   if (details) details.open = true;
 }, true);
-$('generate-form').addEventListener('submit', (event) => {
+$('generate-form').addEventListener('submit', async (event) => {
   event.preventDefault();
   const settings = values(generationKeys);
   if (settings.generation_mode === 'single') settings.chunk_length = 0;
@@ -333,8 +469,28 @@ $('generate-form').addEventListener('submit', (event) => {
   if (!$('text').value.trim()) return showError('Add a script before generating.');
   if (referenceId && !$('reference_text').value.trim()) return showError('Add the exact transcript of your reference audio.');
   if (!referenceId && $('reference_text').value.trim()) return showError('Upload reference audio to accompany its transcript, or clear the transcript.');
-  action('/api/generate', {...settings, text: $('text').value, reference_id: referenceId, reference_text: $('reference_text').value});
+  clearTimeout(planTimer);
+  planning = true;
+  render();
+  let plan;
+  try { plan = await refreshPlan(); }
+  finally { planning = false; render(); }
+  if (!plan) return showError('The request changed during planning. Review it and generate again.');
+  if (plan.invalid) return showError(plan.warnings[0]);
+  if (plan.risk === 'high' && !$('risk-acknowledged').checked) {
+    showError('Review the high-risk request below. Use smart segments, or acknowledge the risk before generating anyway.');
+    $('risk-acknowledged').focus();
+    return;
+  }
+  action('/api/generate', {...settings, text: $('text').value, reference_id: referenceId, reference_text: $('reference_text').value, plan_acknowledged: $('risk-acknowledged').checked});
 });
+
+for (const key of [...generationKeys, 'text', 'reference_text']) {
+  $(key).addEventListener('input', schedulePlan);
+  $(key).addEventListener('change', schedulePlan);
+}
+$('use-smart-segments').addEventListener('click', useSmartSegments);
+$('retry-smart-segments').addEventListener('click', useSmartSegments);
 
 $('reference').addEventListener('change', async () => {
   const file = $('reference').files[0];
@@ -356,6 +512,7 @@ $('clear-reference').addEventListener('click', () => {
   $('reference').value = '';
   $('reference_text').value = '';
   $('reference-status').textContent = 'WAV, FLAC, MP3 or OGG · up to 60 seconds';
+  schedulePlan();
   render();
 });
 
@@ -391,6 +548,7 @@ $('load-sample-reference').addEventListener('click', async () => {
     $('reference').value = '';
     $('reference_text').value = data.reference_text || '';
     $('reference-status').textContent = `Ready: ${data.name || 'Sample voice reference'}`;
+    schedulePlan();
   } catch (error) { showError(error.message); }
   finally { uploading = false; render(); }
 });

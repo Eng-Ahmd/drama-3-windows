@@ -64,7 +64,7 @@ def test_context_limit_checked_before_generation(monkeypatch, prompt_rows, accep
         generate.assert_not_called()
 
 
-def test_context_limit_rechecks_history_conditioned_segment(monkeypatch):
+def test_context_limit_caps_history_conditioned_segment(monkeypatch):
     monkeypatch.setattr(generation, "split_text", lambda *args: ["Hello.", "Again."])
     prompts = [torch.zeros((3, 11), dtype=torch.long), torch.zeros((10000, 11), dtype=torch.long)]
     monkeypatch.setattr(generation, "build_drama3_prompt", Mock(side_effect=prompts))
@@ -73,6 +73,39 @@ def test_context_limit_rechecks_history_conditioned_segment(monkeypatch):
     args = SimpleNamespace(text="Hello. Again.", chunk_length=200, max_frames=512,
                            temperature=.7, top_p=.7, top_k=30, max_context_rows=10240)
     model = SimpleNamespace(tokenizer=None, config=None)
-    with pytest.raises(ValueError, match="10240 context rows"):
-        generation.generate_text(model, args, [], [])
-    generate.assert_called_once()
+    _, reason, segments = generation.generate_text(model, args, [], [])
+    assert reason == "eos" and len(segments) == 2
+    assert generate.call_args_list[0].kwargs["max_new_tokens"] == 512
+    assert generate.call_args_list[1].kwargs["max_new_tokens"] == 240
+
+
+def test_long_total_budget_is_bounded_per_segment_and_reports_progress(monkeypatch):
+    chunks = ["Hello.", " Again."]
+    monkeypatch.setattr(generation, "split_text", lambda *args: chunks)
+    monkeypatch.setattr(generation, "build_drama3_prompt",
+                        Mock(return_value=torch.zeros((100, 11), dtype=torch.long)))
+    generate = Mock(return_value=(frames(2), "eos"))
+    monkeypatch.setattr(generation, "generate_drama3", generate)
+    args = SimpleNamespace(text="".join(chunks), chunk_length=200, max_frames=20000,
+                           temperature=.7, top_p=.7, top_k=30, max_context_rows=10240)
+    updates = []
+    output, reason, _ = generation.generate_text(
+        SimpleNamespace(tokenizer=None, config=None), args, [], [], progress=updates.append)
+    assert len(output) == 4 and reason == "eos"
+    assert [call.kwargs["max_new_tokens"] for call in generate.call_args_list] == [8192, 8192]
+    assert updates[2]["frames"] == updates[2]["completed_frames"] == 2
+    assert updates[2]["completed_characters"] == len(chunks[0])
+    assert updates[3]["frames"] == 4
+    assert updates[3]["completed_characters"] == len(args.text)
+
+
+def test_no_context_capacity_stops_before_model_call(monkeypatch):
+    monkeypatch.setattr(generation, "build_drama3_prompt",
+                        Mock(return_value=torch.zeros((10240, 11), dtype=torch.long)))
+    generate = Mock()
+    monkeypatch.setattr(generation, "generate_drama3", generate)
+    args = SimpleNamespace(text="Hello.", chunk_length=200, max_frames=20000,
+                           temperature=.7, top_p=.7, top_k=30, max_context_rows=10240)
+    with pytest.raises(ValueError, match="No speech generation has started"):
+        generation.generate_text(SimpleNamespace(tokenizer=None, config=None), args, [], [])
+    generate.assert_not_called()

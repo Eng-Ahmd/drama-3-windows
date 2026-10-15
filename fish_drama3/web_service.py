@@ -137,6 +137,12 @@ class Studio:
 
     def generate(self, data: dict) -> dict:
         options = generation_options(data, bool(self.encoder))
+        from fish_drama3.web_planning import generation_plan
+        plan = generation_plan(options)
+        if plan["risk"] == "high" and data.get("plan_acknowledged") is not True:
+            raise ValueError("Frame budget risk: review the preflight estimate before generating. "
+                             "Use smart segments and the recommended total budget, or acknowledge "
+                             "the risk to run with these settings.")
         reference_id = data.get("reference_id")
         if reference_id is not None and not isinstance(reference_id, str):
             raise ValueError("Invalid reference identifier")
@@ -165,8 +171,12 @@ class Studio:
                 raise
             self.state.update(status="generating", message="Generating speech…", result=None,
                               started_at=time.time(), progress=None, phase="encoding_reference",
-                              error=None)
+                              error=None, plan=plan)
         return self.snapshot()
+
+    def plan(self, data: dict) -> dict:
+        from fish_drama3.web_planning import generation_plan
+        return generation_plan(generation_options(data, bool(self.encoder)))
 
     def read_worker(self, worker: subprocess.Popen) -> None:
         log_path = self.output / "worker.log"
@@ -183,8 +193,13 @@ class Studio:
                                 speed = re.search(r"([\d.]+)it/s", line)
                                 self.state["phase"] = "generating"
                                 self.state["message"] = "Generating speech…"
-                                self.state["progress"] = dict(frames=int(match[1]), budget=int(match[2]),
+                                progress = dict(self.state.get("progress") or {})
+                                completed = progress.get("completed_frames", 0)
+                                progress.update(frames=completed + int(match[1]),
+                                    segment_frames=int(match[1]),
+                                    budget=self.pending["max_frames"] if self.pending else int(match[2]),
                                     frames_per_second=float(speed[1]) if speed else None)
+                                self.state["progress"] = progress
                     continue
                 try:
                     event = json.loads(line[marker + len("DRAMA3_EVENT"):].strip())
@@ -219,8 +234,12 @@ class Studio:
             self.state["message"] = event.get("error") or event.get("message", "")
         if event.get("memory"):
             self.state["memory"] = event["memory"]
+        if event.get("performance"):
+            self.state["performance"] = event["performance"]
         if event.get("phase"):
             self.state["phase"] = event["phase"]
+        if event.get("progress"):
+            self.state["progress"] = dict(self.state.get("progress") or {}, **event["progress"])
         if "error" in event:
             self.state["error"] = event["error"]
             self.state["phase"] = "error"

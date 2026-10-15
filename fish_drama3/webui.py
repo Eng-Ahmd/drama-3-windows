@@ -204,6 +204,7 @@ class Handler(BaseHTTPRequestHandler):
             if not isinstance(data, dict):
                 raise ValueError("Expected a JSON object")
             actions = {"/api/load": lambda: self.server.studio.load(data),
+                       "/api/plan": lambda: self.server.studio.plan(data),
                        "/api/sample-reference": lambda: self.sample_reference(data),
                        "/api/generate": lambda: self.server.studio.generate(data),
                        "/api/unload": lambda: self.server.studio.stop(),

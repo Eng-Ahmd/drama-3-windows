@@ -46,8 +46,12 @@ def placement_options(data: dict) -> dict:
 
 def generation_options(data: dict, mp3_available: bool) -> dict:
     options = {key: data.get(key, value) for key, value in DEFAULTS.items()}
+    mode = options["generation_mode"]
+    if mode not in ("single", "chunked"):
+        raise ValueError("Generation mode must be single or chunked")
     for key, low, high in [("seed", 0, 2**32 - 1), ("top_k", 1, 2**31 - 1),
-                           ("max_frames", 1, 8192), ("chunk_length", 0, 2000)]:
+                           ("max_frames", 1, 8192 if mode == "single" else 65536),
+                           ("chunk_length", 0, 2000)]:
         options[key] = integer(options[key], key, low, high)
     if 0 < options["chunk_length"] < 32:
         raise ValueError("Chunk length must be 0 or 32..2000")
@@ -55,6 +59,8 @@ def generation_options(data: dict, mp3_available: bool) -> dict:
         raise ValueError("Generation mode must be single or chunked")
     if options["generation_mode"] == "single":
         options["chunk_length"] = 0
+    elif options["chunk_length"] == 0:
+        raise ValueError("Smart segments require a passage length of 32..2000 characters")
     for key in ("temperature", "top_p"):
         value = options[key]
         if isinstance(value, bool) or not isinstance(value, (int, float)):
