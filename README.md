@@ -31,7 +31,9 @@ The monitor follows preparation, reference encoding, prefill, acoustic generatio
 
 ## Hear a complete podcast
 
-[![Play The Small Signal — 3:16 of one-pass narration](docs/assets/podcast-sample.svg)](https://huggingface.co/Eng-Ahmd/Drama-3-Windows-GGUF/resolve/main/demos/podcast-small-signal.mp3)
+https://github.com/user-attachments/assets/a59179be-b1dc-45d2-b049-f5105606cf0a
+
+*Play here without leaving GitHub. Enable sound in the player if it starts muted. The video pairs the original narration with static artwork; WAV and MP3 downloads remain below.*
 
 [**The Small Signal · 3:16**](https://huggingface.co/Eng-Ahmd/Drama-3-Windows-GGUF#podcast--the-small-signal) is an original 592-word narration generated in **one request, without text chunks, retries or speech edits**. Load the included sample in the studio to try it yourself.
 

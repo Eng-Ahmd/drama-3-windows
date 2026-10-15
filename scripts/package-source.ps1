@@ -12,6 +12,7 @@ if (-not $target.StartsWith($sourceRoot + [IO.Path]::DirectorySeparatorChar, [St
 # Source only: every path is individually named. Never recursively copy a project directory.
 $allowlist = @(
     'docs/assets/studio-hero.svg', 'docs/assets/podcast-sample.svg',
+    'docs/assets/podcast-poster.jpg',
     'docs/assets/studio-overview.jpg', 'docs/assets/studio-progress.jpg',
     'docs/assets/studio-podcast.jpg',
     'README.md', 'NOTICE.md', 'LICENSE',
@@ -52,6 +53,7 @@ $allowlist = @(
 )
 $requiredPaths = @(
     'docs/assets/studio-hero.svg', 'docs/assets/podcast-sample.svg',
+    'docs/assets/podcast-poster.jpg',
     'docs/assets/studio-overview.jpg', 'docs/assets/studio-progress.jpg',
     'docs/assets/studio-podcast.jpg',
     'README.md', 'NOTICE.md', 'LICENSE', 'pyproject.toml', 'requirements-runtime.txt',
