@@ -132,7 +132,8 @@ function renderTransport() {
 
 function renderExpertPerformance() {
   const element = $('expert-performance');
-  const profile = state.performance || state.result?.metrics?.expert_profile;
+  const active = ['loading', 'generating', 'unloading'].includes(state.status);
+  const profile = state.performance || (!active ? state.result?.metrics?.expert_profile : null);
   const cpu = profile?.backends?.cpu;
   const gpu = profile?.backends?.gpu;
   const available = profile?.enabled && (cpu || gpu);
@@ -147,7 +148,8 @@ function renderExpertPerformance() {
 
 function renderSpeechProgress() {
   const progress = state.progress || {};
-  const metrics = state.result?.metrics || {};
+  const preparing = ['loading', 'unloading'].includes(state.status);
+  const metrics = preparing ? {} : state.result?.metrics || {};
   const running = state.status === 'generating';
   let percent = null;
   let label = 'Estimated speech progress';
@@ -156,7 +158,7 @@ function renderSpeechProgress() {
     percent = Math.min(100, progress.stage_completed / progress.stage_total * 100);
     label = 'Audio decode progress';
     detail = `${progress.stage_completed} / ${progress.stage_total} codec windows · CPU waveform decoding`;
-  } else if (running && state.phase === 'generating') {
+  } else if (running && (state.phase === 'generating' || (state.phase === 'prefill' && progress.completed_characters > 0))) {
     const estimatedFrames = progress.estimated_frames || state.plan?.estimated_frames || generationPlan?.estimated_frames;
     if (estimatedFrames > 0 && Number.isFinite(progress.frames)) percent = progress.frames / estimatedFrames * 100;
     const segmentCharacters = progress.segment_characters ?? generationPlan?.chunks?.[progress.segment_index - 1]?.characters;
@@ -341,7 +343,8 @@ function renderPlan(plan) {
   if (!plan) return;
   $('plan-card').dataset.risk = plan.risk;
   $('plan-risk').textContent = plan.risk === 'high' ? 'HIGH RISK' : plan.risk === 'warning' ? 'REVIEW REQUEST' : 'READY TO REVIEW';
-  $('plan-summary').textContent = `${plan.words.toLocaleString()} words · ${plan.segments} ${plan.segments === 1 ? 'passage' : 'passages'} · approximately ${formatSeconds(plan.estimated_seconds)} of speech · ${formatSeconds(plan.budget_seconds)} total frame allowance`;
+  const speechRange = plan.conservative_seconds ? `${formatSeconds(plan.estimated_seconds)}–${formatSeconds(plan.conservative_seconds)}` : formatSeconds(plan.estimated_seconds);
+  $('plan-summary').textContent = `${plan.words.toLocaleString()} words · ${plan.segments} ${plan.segments === 1 ? 'passage' : 'passages'} · estimated ${speechRange} of speech · ${formatSeconds(plan.budget_seconds)} total frame allowance`;
   $('plan-warnings').replaceChildren();
   for (const warning of plan.warnings || []) {
     const item = document.createElement('li');

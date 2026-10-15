@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -121,13 +122,18 @@ class Studio:
             if self.worker is not None or self.state["status"] not in ("unloaded", "error"):
                 raise ValueError("Unload the current model before changing model settings")
             self.state.update(status="loading", message="Verifying files and loading model…",
-                              model=options, phase="verifying", error=None, started_at=time.time())
+                              model=options, phase="verifying", error=None, started_at=time.time(),
+                              performance=None)
             try:
+                environment = os.environ.copy()
+                environment.setdefault("OMP_WAIT_POLICY", "ACTIVE")
+                environment.setdefault("FISH_DRAMA3_TOWER_GRAPH", "1")
                 self.worker = subprocess.Popen(
                     [sys.executable, "-u", "-m", "fish_drama3.web_worker"],
                     stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace",
-                    bufsize=1, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+                    bufsize=1, env=environment,
+                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
                 self.send(dict(action="load", **options))
             except (OSError, RuntimeError):
                 self.stop("Could not start model worker")
@@ -171,7 +177,7 @@ class Studio:
                 raise
             self.state.update(status="generating", message="Generating speech…", result=None,
                               started_at=time.time(), progress=None, phase="encoding_reference",
-                              error=None, plan=plan)
+                              error=None, plan=plan, performance=None)
         return self.snapshot()
 
     def plan(self, data: dict) -> dict:
@@ -300,5 +306,5 @@ class Studio:
         with self.lock:
             self.pending = None
             self.state.update(status="unloaded", message=message, model=None, memory=None,
-                              phase="idle", error=None)
+                              phase="idle", error=None, performance=None)
         return self.snapshot()

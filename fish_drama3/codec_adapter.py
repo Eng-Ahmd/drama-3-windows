@@ -354,7 +354,7 @@ class CodecBridge:
 
     def decode(self, rows: np.ndarray, threads: int = 8) -> np.ndarray:
         codes = prepare_codes(rows)
-        if not self.handle or not 1 <= threads <= 256 or codes.shape[1] > (2**31 - 1) // 2048:
+        if not self.handle or not 1 <= threads <= 256 or codes.shape[1] > 4096:
             raise ValueError("Closed codec or invalid decode dimensions/threads")
         output = np.empty(codes.shape[1] * 2048, dtype=np.float32)
         count = ctypes.c_int()
@@ -366,7 +366,9 @@ class CodecBridge:
             raise RuntimeError(error.value.decode("utf-8", errors="replace"))
         if not 0 < count.value <= output.size or not np.isfinite(output[:count.value]).all():
             raise RuntimeError("Invalid native codec output")
-        return output[:count.value].copy()
+        # Keep the owned native-output buffer alive through the NumPy view;
+        # copying every decoded window doubles its transient audio allocation.
+        return output[:count.value]
 
     def close(self) -> None:
         if self.handle:

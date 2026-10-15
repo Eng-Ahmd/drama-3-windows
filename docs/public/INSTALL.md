@@ -1,6 +1,6 @@
 # Installation
 
-This guide installs or builds the Windows release `0.2.0` on Windows 11. The current environment has been exercised with Python 3.13, PyTorch 2.13.0+cu132, Visual Studio 2022, and CUDA Toolkit 13.3. A clean-machine installation has not yet been qualified.
+This guide installs or builds the Windows release `0.2.1` on Windows 11. The current environment has been exercised with Python 3.13, PyTorch 2.13.0+cu132, Visual Studio 2022, and CUDA Toolkit 13.3. A clean-machine installation has not yet been qualified.
 
 ## Prerequisites
 
@@ -14,7 +14,7 @@ This guide installs or builds the Windows release `0.2.0` on Windows 11. The cur
 
 ## Use the prebuilt Windows runtime
 
-The `fish-drama3-windows-runtime-0.2.0-win-x64.zip` release archive contains the tested CPU and CUDA runtime DLLs. Install the matching 0.2.0 Python source and native archive together. The studio needs the new CUDA bridge reserve-budget ABI for automatic placement; older native bridges do not provide it. Model bundles remain compatible with runtime 0.1.1 or newer. Extract it at the repository root so the files land under `builds/drama3-inspect/Release` and `builds/drama3-cuda/Release`; do not rename those directories. Check the included `SHA256SUMS.txt` against the extracted DLL and license files before use.
+The `fish-drama3-windows-runtime-0.2.1-win-x64.zip` release archive contains the tested CPU and CUDA runtime DLLs. Install the matching 0.2.1 Python source and native archive together. The studio needs the new CUDA bridge reserve-budget ABI for automatic placement; older native bridges do not provide it. Model bundles remain compatible with runtime 0.1.1 or newer. Extract it at the repository root so the files land under `builds/drama3-inspect/Release` and `builds/drama3-cuda/Release`; do not rename those directories. Check the included `SHA256SUMS.txt` against the extracted DLL and license files before use.
 
 Install the Microsoft Visual C++ 2015–2022 x64 Redistributable separately; it is not included. CUDA inference also requires an NVIDIA driver and CUDA Toolkit 13.3 or newer. NVIDIA and Microsoft DLLs are not redistributed in the archive. The Python environment and pinned Fish Speech reference checkout are still required; run `scripts/bootstrap.ps1` to fetch and verify source pins. The prebuilt archive avoids compiling the runtime libraries. The included CPU GGML library also provides the pinned quantizer for local conversion; a source build is optional when using this archive.
 
@@ -129,5 +129,5 @@ The studio defaults to **automatic expert placement** with **3% of total VRAM ke
 
 Choose **Manual** to request 0–40 GPU expert layers; the manual field starts at 16. This is a requested count, not a claim that 16 layers fit every machine or request. Both modes enforce the chosen reserve. Continuous monitoring stops the worker below the 3% VRAM reserve or 8 GiB free host RAM.
 
-Automatic placement and the configurable native reserve require the **0.2.0 Python runtime and matching 0.2.0 native CUDA bridge**. Earlier DLLs do not export the required reserve-budget ABI. The model bundles themselves remain compatible with runtime 0.1.1 or newer.
+Automatic placement and the configurable native reserve require the **0.2.1 Python runtime and matching 0.2.1 native CUDA bridge**. Earlier DLLs do not export the required reserve-budget ABI. The model bundles themselves remain compatible with runtime 0.1.1 or newer.
 

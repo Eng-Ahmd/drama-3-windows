@@ -4,7 +4,7 @@
 
 **Expressive speech, voice cloning and full-script narration in a local Windows studio.** Load Drama 3 once, shape the performance, listen and export your recording with the settings that made it.
 
-[**Get Windows Studio 0.2.0**](https://github.com/Eng-Ahmd/drama-3-windows/releases/latest) · [**Download the model**](https://huggingface.co/Eng-Ahmd/Drama-3-Windows-GGUF) · [**Installation**](docs/public/INSTALL.md) · [**Studio guide**](docs/public/WEB_UI.md)
+[**Get Windows Studio 0.2.1**](https://github.com/Eng-Ahmd/drama-3-windows/releases/latest) · [**Download the model**](https://huggingface.co/Eng-Ahmd/Drama-3-Windows-GGUF) · [**Installation**](docs/public/INSTALL.md) · [**Studio guide**](docs/public/WEB_UI.md)
 
 ![Windows Studio showing the script editor, generation controls and live system vitals](docs/assets/studio-overview.jpg)
 
@@ -29,13 +29,15 @@ The monitor follows preparation, reference encoding, prefill, acoustic generatio
 
 </details>
 
+Runtime 0.2.1 adds GPU audio-tower CUDA graphs, expert bridge optimizations and live timing counters. A matched warm test measured approximately 28% higher acoustic decode throughput; see the [performance notes and reproduction scripts](docs/public/PERFORMANCE.md) for scope and tradeoffs.
+
 ## Hear a complete podcast
 
 https://github.com/user-attachments/assets/a59179be-b1dc-45d2-b049-f5105606cf0a
 
 *Play here without leaving GitHub. Enable sound in the player if it starts muted. The video pairs the original narration with static artwork; WAV and MP3 downloads remain below.*
 
-[**The Small Signal · 3:16**](https://huggingface.co/Eng-Ahmd/Drama-3-Windows-GGUF#podcast--the-small-signal) is an original 592-word narration generated in **one request, without text chunks, retries or speech edits**. Load the included sample in the studio to try it yourself.
+[**The Small Signal · 3:16**](https://huggingface.co/Eng-Ahmd/Drama-3-Windows-GGUF#podcast-%C2%B7-the-small-signal) is an original 592-word narration generated in **one request, without text chunks, retries or speech edits**. Load the included sample in the studio to try it yourself.
 
 [**Listen / download MP3**](https://huggingface.co/Eng-Ahmd/Drama-3-Windows-GGUF/resolve/main/demos/podcast-small-signal.mp3) · [**Lossless WAV**](https://huggingface.co/Eng-Ahmd/Drama-3-Windows-GGUF/resolve/main/demos/podcast-small-signal.wav) · [Full script](examples/samples/podcast.txt) · [Importable settings and provenance](https://huggingface.co/Eng-Ahmd/Drama-3-Windows-GGUF/resolve/main/demos/podcast-small-signal-settings.json)
 
@@ -51,7 +53,7 @@ The untouched recording completed at 4216 frames and measured **0.34% ASR word e
 
 ## Start creating
 
-Follow the [installation guide](docs/public/INSTALL.md) to set up Windows prerequisites, Python, the **matching 0.2.0 native libraries**, and the model and codec bundles. Weights are downloaded separately; MP3 export requires FFmpeg with libmp3lame.
+Follow the [installation guide](docs/public/INSTALL.md) to set up Windows prerequisites, Python, the **matching 0.2.1 native libraries**, and the model and codec bundles. Weights are downloaded separately; MP3 export requires FFmpeg with libmp3lame.
 
 Then launch the studio from your runtime environment:
 
@@ -67,7 +69,7 @@ The [studio guide](docs/public/WEB_UI.md) covers controls, project settings, out
 
 Drama 3 is a **35.9B MoE** speech model. This Windows port combines a PyTorch backbone and audio tower, native GGML CPU/CUDA routed experts, and a native reference encoder/audio decoder. The custom `fish_drama3` GGUF bundle requires this matching runtime.
 
-Expert weights use **Q4_K**, the backbone **Q8_0**, sensitive vectors **F32**, and the audio tower **BF16**. Learned codec weights use F32, with BF16 RoPE tables. The model bundle is about **21.67 GiB**, plus **1.46 GiB** for the codec. The model bundles remain compatible with runtime 0.1.1 or newer; the current studio's automatic placement requires the 0.2.0 Python source and native bridge together.
+Expert weights use **Q4_K**, the backbone **Q8_0**, sensitive vectors **F32**, and the audio tower **BF16**. Learned codec weights use F32, with BF16 RoPE tables. The model bundle is about **21.67 GiB**, plus **1.46 GiB** for the codec. The model bundles remain compatible with runtime 0.1.1 or newer; the current studio's automatic placement requires the 0.2.1 Python source and native bridge together.
 
 [Model card](docs/public/MODEL_CARD.md) · [Quality and qualification](docs/public/QUALITY.md) · [Attribution](NOTICE.md)
 

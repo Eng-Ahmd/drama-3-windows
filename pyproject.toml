@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fish-drama3-native"
-version = "0.2.0"
+version = "0.2.1"
 description = "Hybrid Windows inference and conversion tools using PyTorch and native GGML"
 readme = "README.md"
 requires-python = ">=3.11,<3.14"

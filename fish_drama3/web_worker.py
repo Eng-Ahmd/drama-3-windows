@@ -165,9 +165,16 @@ class Session:
             if self.bridge is not None:
                 self.bridge.close()
         finally:
-            if self.codec is not None:
-                self.codec.close()
-            self.model = self.bridge = self.codec = None
+            try:
+                if self.codec is not None:
+                    self.codec.close()
+            finally:
+                if self.model is not None:
+                    tower = getattr(self.model, "audio_decoder", None)
+                    if tower is not None and "_hybrid_decode_graphs" in vars(tower):
+                        from fish_drama3.tower_graphs import uninstall_tower_graphs
+                        uninstall_tower_graphs(self.model)
+                self.model = self.bridge = self.codec = None
 
     def describe(self) -> dict[str, Any]:
         return dict(bundle=str(self.bundle), codec=str(self.codec_path), threads=self.threads,
@@ -177,33 +184,21 @@ class Session:
 
     def generate(self, request: dict[str, Any]) -> dict[str, Any]:
         import torch
-        from fish_drama3.generation import generate_text, validate_drama3_text
+        from fish_drama3.generation import generate_text
 
-        args = generation_options(request)
-        from fish_drama3.web_planning import generation_plan
-        generation_plan(vars(args))
-        validate_drama3_text(args.text, "text")
-        if args.reference_text:
-            validate_drama3_text(args.reference_text, "reference")
-        if args.output.exists() or args.output.with_suffix(".json").exists():
-            raise FileExistsError("Refusing to replace an existing result")
+        args = validated_generation_request(request)
         preflight()
         torch.manual_seed(args.seed)
         torch.cuda.reset_peak_memory_stats()
         if hasattr(self.bridge, "profile_summary"):
             self.bridge.profile_summary(reset=True)
         started = time.perf_counter()
-        texts, codes, source = [], [], None
-        if args.reference_audio:
-            emit(phase="encoding_reference", message="Encoding your reference voice…")
-            samples, source = reference_audio(args.reference_audio)
-            codes = [torch.from_numpy(self.codec.encode(samples, self.threads).astype(np.int64))]
-            texts = [args.reference_text]
+        texts, codes, source = self.voice_context(args)
         with torch.inference_mode():
             emit(phase="prefill", message="Reading the script and voice context…")
             frames, reason, segments = generate_text(
                 self.model, args, texts, codes,
-                progress=lambda data: emit(phase="generating", progress=data))
+                progress=emit_generation_progress)
             if reason != "eos" and not args.allow_partial:
                 raise RuntimeError("Frame limit reached; no complete WAV published. "
                                    "Use smart segments with a larger total frame budget, "
@@ -233,6 +228,16 @@ class Session:
             emit(phase="exporting", message="Saving the original WAV and generation details…")
             publish_wave(args.output, audio, metrics)
         return dict(output=str(args.output), metrics=metrics)
+
+    def voice_context(self, args: argparse.Namespace) -> tuple[list, list, dict | None]:
+        import torch
+
+        if not args.reference_audio:
+            return [], [], None
+        emit(phase="encoding_reference", message="Encoding your reference voice…")
+        samples, source = reference_audio(args.reference_audio)
+        codes = [torch.from_numpy(self.codec.encode(samples, self.threads).astype(np.int64))]
+        return [args.reference_text], codes, source
 
     def decode_audio(self, rows: np.ndarray) -> np.ndarray:
         """Decode one continuous stream with bounded codec context memory."""
@@ -271,7 +276,31 @@ class Session:
                     allow_partial=args.allow_partial, reference=source,
                     reference_text=args.reference_text, segments=segments,
                     finish_reason=reason, complete=reason == "eos", load_seconds=self.load_seconds,
-                    runtime=f"hybrid-windows-web-{__version__}")
+                    runtime=f"hybrid-windows-web-{__version__}",
+                    placement=getattr(self, "placement", {}),
+                    omp_wait_policy=os.environ.get("OMP_WAIT_POLICY"))
+
+
+def emit_generation_progress(progress: dict[str, Any]) -> None:
+    preparing = not progress["segment_frames"] and not progress["segment_complete"]
+    phase = "prefill" if preparing else "generating"
+    message = (f"Reading passage {progress['segment_index']} of {progress['segment_count']}…"
+               if preparing else "Generating speech…")
+    emit(phase=phase, progress=progress, message=message)
+
+
+def validated_generation_request(request: dict[str, Any]) -> argparse.Namespace:
+    from fish_drama3.generation import validate_drama3_text
+    from fish_drama3.web_planning import generation_plan
+
+    args = generation_options(request)
+    generation_plan(vars(args))
+    validate_drama3_text(args.text, "text")
+    if args.reference_text:
+        validate_drama3_text(args.reference_text, "reference")
+    if args.output.exists() or args.output.with_suffix(".json").exists():
+        raise FileExistsError("Refusing to replace an existing result")
+    return args
 
 
 def fatal_error(error: Exception) -> bool:

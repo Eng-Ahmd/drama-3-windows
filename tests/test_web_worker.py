@@ -200,3 +200,12 @@ def test_long_decode_preserves_continuous_samples_across_context_boundaries(fram
         for index, (first, count) in enumerate(calls[1:], start=1):
             assert first == index * 1792 - 256
             assert count == min(1792 + 256, frame_count - first)
+def test_passage_progress_distinguishes_prefill_from_audio_generation(capsys):
+    progress = dict(segment_frames=0, segment_complete=False,
+                    segment_index=2, segment_count=4)
+    worker.emit_generation_progress(progress)
+    event = json.loads(capsys.readouterr().out.removeprefix("DRAMA3_EVENT"))
+    assert event["phase"] == "prefill" and "2 of 4" in event["message"]
+    worker.emit_generation_progress(dict(progress, segment_frames=7))
+    event = json.loads(capsys.readouterr().out.removeprefix("DRAMA3_EVENT"))
+    assert event["phase"] == "generating"

@@ -61,7 +61,7 @@ $nativeCudaOutputArgs = @("-DCMAKE_RUNTIME_OUTPUT_DIRECTORY=$nativeCudaOutput", 
 if ($Generator -like 'Visual Studio*') {
     $nativeCudaOutputArgs = @("-DCMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE=$nativeCudaOutput", "-DCMAKE_LIBRARY_OUTPUT_DIRECTORY_RELEASE=$nativeCudaOutput")
 }
-cmake -S (Join-Path $Root 'native/cuda') -B $nativeCudaBuild -G $Generator -DCMAKE_BUILD_TYPE=Release -DDONOR_BUILD=$cudaBuild @nativeCudaOutputArgs
+cmake -S (Join-Path $Root 'native/cuda') -B $nativeCudaBuild -G $Generator -DCMAKE_BUILD_TYPE=Release -DDONOR_BUILD=$cudaBuild -DCPU_DONOR_BUILD=$cpuBuild @nativeCudaOutputArgs
 if ($LASTEXITCODE -ne 0) { throw 'Native CUDA bridge configuration failed.' }
 cmake --build $nativeCudaBuild --config Release --parallel 1
 if ($LASTEXITCODE -ne 0) { throw 'Native CUDA bridge build failed.' }

@@ -1,6 +1,6 @@
 # Fish Audio Drama 3 · Windows Studio
 
-Install the Windows runtime 0.2.0 source and matching native bridge, its Python dependencies and the matching native libraries using [INSTALL.md](INSTALL.md). Download the model and codec manifests as documented there. The app uses the installed runtime and has no additional web framework dependency.
+Install the Windows runtime 0.2.1 source and matching native bridge, its Python dependencies and the matching native libraries using [INSTALL.md](INSTALL.md). Download the model and codec manifests as documented there. The app uses the installed runtime and has no additional web framework dependency.
 
 Start the app from your runtime environment:
 
@@ -20,13 +20,13 @@ The studio defaults to **automatic expert placement** with **3% of total VRAM ke
 
 Choose **Manual** to request 0–40 GPU expert layers; the manual field starts at 16. This is a requested count, not a claim that 16 layers fit every machine or request. Both modes enforce the chosen reserve. Continuous monitoring stops the worker below the chosen VRAM reserve or 8 GiB free host RAM.
 
-Automatic placement and the configurable native reserve require the **0.2.0 Python runtime and matching 0.2.0 native CUDA bridge**. Earlier DLLs do not export the required reserve-budget ABI. The model bundles themselves remain compatible with runtime 0.1.1 or newer.
+Automatic placement and the configurable native reserve require the **0.2.1 Python runtime and matching 0.2.1 native CUDA bridge**. Earlier DLLs do not export the required reserve-budget ABI. The model bundles themselves remain compatible with runtime 0.1.1 or newer.
 
 The model stays loaded across requests. Unload it when finished to release model memory and VRAM. Expert controls select routed expert placement and do not change the model's Q4_K / Q8_0 weight format.
 
 ## Generate and listen
 
-Enter your script or load **The Small Signal**, the complete original 592-word [podcast script](../../examples/samples/podcast.txt). The default **Single pass** mode submits the full script in one request without text splitting or speech edits. The [published one-pass example](https://huggingface.co/Eng-Ahmd/Drama-3-Windows-GGUF#podcast--the-small-signal) completed the full script in one request without retries or speech edits: 195.79 seconds, with 0.34% ASR WER. This is one checked sample; other runs can omit or repeat words, stop early or pause. Automated transcription does not replace listening.
+Enter your script or load **The Small Signal**, the complete original 592-word [podcast script](../../examples/samples/podcast.txt). The default **Single pass** mode submits the full script in one request without text splitting or speech edits. The [published one-pass example](https://huggingface.co/Eng-Ahmd/Drama-3-Windows-GGUF#podcast-%C2%B7-the-small-signal) completed the full script in one request without retries or speech edits: 195.79 seconds, with 0.34% ASR WER. This is one checked sample; other runs can omit or repeat words, stop early or pause. Automated transcription does not replace listening.
 
 The codec may decode the generated acoustic stream in bounded context windows to limit memory. Those decoder windows do not split the text into separate synthesis requests or edit speech.
 
@@ -67,6 +67,10 @@ GPU display statistics come from NVIDIA/NVML sampling. The worker's memory guard
 ## Understanding generation speed
 
 The current hybrid runtime executes CPU expert layers serially between GPU backbone operations. It also transfers activations and routing data between the PyTorch and native expert paths. GPU compute can wait during CPU work and synchronization, while the final native codec decode runs on CPU. GPU utilization below 100% can therefore reflect these pipeline bottlenecks; the percentage alone does not establish a driver fault. VRAM placement, CPU thread count and passage length can affect timing differently, so compare a short fixed script with the same settings before drawing speed conclusions.
+
+The expert timing panel separates CPU and GPU expert calls from host staging and synchronization. Staging time is already included in the expert wall totals; do not add the figures together. These counters cover the expert bridge, not the entire backbone, audio tower or codec. The studio defaults to `OMP_WAIT_POLICY=ACTIVE` unless you already set that environment variable. Matched tests favored active waiting for combined generation and codec time, although it can keep CPU threads busy between operations. Passive waiting reduced idle spinning but slowed generation on the tested machine. Compare complete generation and decoding times when tuning thread counts.
+
+The studio enables CUDA graphs for the GPU audio tower by default. It captures only the tower; CPU expert routing stays outside the graphs. Graph buffers are allocated before automatic expert placement, so they count against the same VRAM budget and reserve. Unsupported capture falls back to eager execution. Set `FISH_DRAMA3_TOWER_GRAPH=0` before launching the studio to disable this optimization for comparison.
 
 ## Save audio and settings
 

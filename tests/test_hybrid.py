@@ -216,6 +216,8 @@ def test_staged_loading_plans_after_dense_weights_and_caches(monkeypatch, manual
     monkeypatch.setattr(hybrid, "load_model", lambda *args, **kwargs: (
         sequence.append(("dense", kwargs)) or (model, old)))
     monkeypatch.setattr(hybrid, "ensure_drama3_caches", lambda value, capacity: sequence.append(("cache", capacity)))
+    monkeypatch.setattr(hybrid, "prepare_hybrid_tower", lambda value:
+                        sequence.append(("tower", None)) or {"enabled": True})
     monkeypatch.setattr(torch.cuda, "synchronize", lambda device: sequence.append(("sync", device)))
     monkeypatch.setattr(torch.cuda, "empty_cache", lambda: None)
     monkeypatch.setattr(torch.cuda, "mem_get_info", lambda device: (8 * 2**30, 16 * 2**30))
@@ -224,6 +226,8 @@ def test_staged_loading_plans_after_dense_weights_and_caches(monkeypatch, manual
     _, bridge, placement = hybrid.load_model_placed(Path("model"), gpu_layers=manual)
     assert sequence[0] == ("dense", dict(threads=8, gpu_layers=0))
     assert sequence[1] == ("cache", 10240)
+    assert sequence[2] == ("tower", None) and sequence[3] == ("sync", 0)
+    assert placement["tower_graphs"]["enabled"] is True
     assert placement["gpu_expert_layers"] == (40 if manual is None else manual)
     assert bridge is (old if manual == 0 else replacement)
     assert placement["headroom_bytes"] == int(np.ceil(16 * 2**30 * .03))
@@ -265,3 +269,33 @@ def test_missing_budget_abi_is_not_silently_retried_as_allocation_failure(monkey
                                      dict(gpu_expert_layers=16, headroom_bytes=512), [1] * 40)
     constructor.assert_called_once()
     old.close.assert_not_called()
+
+
+def test_failed_placement_releases_prepared_tower_graphs(monkeypatch) -> None:
+    from fish_drama3 import tower_graphs
+
+    model, bridge = fake_auto_model(), Mock()
+    model.audio_decoder = SimpleNamespace(_hybrid_decode_graphs=object())
+    cleanup = Mock()
+    monkeypatch.setattr(tower_graphs, "uninstall_tower_graphs", cleanup)
+    monkeypatch.setattr(hybrid, "load_model", lambda *args, **kwargs: (model, bridge))
+    monkeypatch.setattr(hybrid, "ensure_drama3_caches", Mock())
+    monkeypatch.setattr(hybrid, "prepare_hybrid_tower", Mock(return_value={"enabled": True}))
+    monkeypatch.setattr(torch.cuda, "synchronize", Mock())
+    monkeypatch.setattr(torch.cuda, "empty_cache", Mock())
+    monkeypatch.setattr(torch.cuda, "mem_get_info", Mock(side_effect=RuntimeError("lost device")))
+    with pytest.raises(RuntimeError, match="lost device"):
+        hybrid.load_model_placed(Path("model"))
+    bridge.close.assert_called_once()
+    cleanup.assert_called_once_with(model)
+
+
+def test_invalid_performance_environment_closes_allocated_bridge(monkeypatch) -> None:
+    library = SimpleNamespace(drama3_open=Mock(return_value=123),
+                              drama3_close=Mock(), drama3_experts=Mock(),
+                              drama3_configure_performance=Mock())
+    monkeypatch.setattr(hybrid.ctypes, "CDLL", Mock(return_value=library))
+    monkeypatch.setenv("FISH_DRAMA3_CPU_EXPERT_POLL", "invalid")
+    with pytest.raises(ValueError):
+        ExpertBridge(Path("model.gguf"))
+    library.drama3_close.assert_called_once_with(123)

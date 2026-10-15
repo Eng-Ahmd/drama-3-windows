@@ -3,9 +3,41 @@
 // Keep the im2col payload in F32.
 // GGML source copyright/license remains in upstream/s2.cpp/ggml/LICENSE.
 #include "ggml.h"
+#include "ggml-cpu.h"
 #include <cmath>
 #include <cstdint>
 #include <stdexcept>
+
+// Called only by our generated, opt-in donor overlay. The codec handle mutex
+// serializes use; the overlay detaches/frees this owned pool during reset.
+void drama3_codec_set_threads(ggml_backend_t backend, ggml_threadpool_t * pool,
+                             int * pool_threads, int threads) {
+    if (!backend || !pool || !pool_threads || threads < 1 || threads > 256) {
+        throw std::runtime_error("invalid persistent codec CPU threadpool inputs");
+    }
+    if (!*pool || *pool_threads != threads) {
+        ggml_backend_cpu_set_threadpool(backend, nullptr);
+        if (*pool) ggml_threadpool_free(*pool);
+        *pool = nullptr;
+        *pool_threads = 0;
+        auto parameters = ggml_threadpool_params_default(threads);
+        // Sleeping workers must not compete with model generation between
+        // reference encoding and waveform decoding.
+        parameters.poll = 0;
+        *pool = ggml_threadpool_new(&parameters);
+        if (!*pool) throw std::runtime_error("cannot allocate codec CPU threadpool");
+        *pool_threads = threads;
+        ggml_backend_cpu_set_threadpool(backend, *pool);
+    }
+    ggml_backend_cpu_set_n_threads(backend, threads);
+}
+
+void drama3_codec_free_threads(ggml_backend_t backend, ggml_threadpool_t & pool) {
+    if (!pool) return;
+    ggml_backend_cpu_set_threadpool(backend, nullptr);
+    ggml_threadpool_free(pool);
+    pool = nullptr;
+}
 
 namespace {
 // Fish Speech 1ff3c3ed2f80d3106a83909dd25b83129c3d816f,

@@ -11,6 +11,7 @@ import math
 import os
 import sys
 import time
+from threading import Lock
 from pathlib import Path
 from typing import Any
 
@@ -35,14 +36,19 @@ from fish_speech.models.text2semantic.sampling import DEFAULT_TEMPERATURE, DEFAU
 
 class ExpertBridge:
     def __init__(self, model: Path, threads: int = 8, gpu_layers: int = 0,
-                 headroom_bytes: int | None = None):
+                 headroom_bytes: int | None = None, library: Path | None = None,
+                 profile: bool | None = None):
         if not 0 <= gpu_layers <= 40 or not 1 <= threads <= 256:
             raise ValueError("Invalid GPU expert layer count or CPU threads")
         if headroom_bytes is not None and not 0 <= headroom_bytes < 2**64:
             raise ValueError("Invalid native GPU headroom byte count")
         build = "drama3-cuda" if gpu_layers else "drama3-inspect"
-        dll = ROOT / f"builds/{build}/Release/drama3-experts-bridge.dll"
+        dll = library or ROOT / f"builds/{build}/Release/drama3-experts-bridge.dll"
         self.library = ctypes.CDLL(str(dll))
+        self.gpu_layers = gpu_layers
+        self.profile_enabled = profile if profile is not None else os.environ.get("FISH_DRAMA3_PROFILE_EXPERTS") == "1"
+        self.profile_totals: dict[str, dict[str, float | int]] = {}
+        self.profile_lock = Lock()
         self.library.drama3_open.argtypes = [ctypes.c_char_p, ctypes.c_void_p, ctypes.c_size_t]
         self.library.drama3_open.restype = ctypes.c_void_p
         self.library.drama3_close.argtypes = [ctypes.c_void_p]
@@ -53,6 +59,15 @@ class ExpertBridge:
             ctypes.c_int, ctypes.c_void_p, ctypes.c_size_t,
         ]
         self.library.drama3_experts.restype = ctypes.c_int
+        self.device_entry = getattr(self.library, "drama3_experts_cuda_device", None)
+        device_mode = os.environ.get("FISH_DRAMA3_GPU_DEVICE_BRIDGE", "auto")
+        if device_mode not in ("auto", "0", "1"):
+            raise ValueError("FISH_DRAMA3_GPU_DEVICE_BRIDGE must be auto, 0, or 1")
+        self.device_enabled = device_mode != "0" and self.device_entry is not None
+        self.device_min_tokens = 1 if device_mode == "1" else 128
+        if self.device_entry is not None:
+            self.device_entry.argtypes = self.library.drama3_experts.argtypes
+            self.device_entry.restype = ctypes.c_int
         error = ctypes.create_string_buffer(1024)
         if gpu_layers:
             self.handle = self.open_cuda(model, gpu_layers, headroom_bytes, error)
@@ -61,6 +76,50 @@ class ExpertBridge:
         self.threads = threads
         if not self.handle:
             raise RuntimeError(error.value.decode(errors="replace"))
+        try:
+            self.configure_performance()
+        except BaseException:
+            self.close()
+            raise
+
+    def configure_performance(self, poll: int | None = None, cache: bool | None = None) -> None:
+        function = getattr(self.library, "drama3_configure_performance", None)
+        self.performance = dict(configurable=function is not None,
+                                cuda_device_available=self.device_entry is not None,
+                                cuda_device_enabled=self.device_enabled,
+                                cuda_device_min_tokens=self.device_min_tokens)
+        if function is None:
+            return
+        selected = int(os.environ.get("FISH_DRAMA3_CPU_EXPERT_POLL", "0")) if poll is None else poll
+        enabled = os.environ.get("FISH_DRAMA3_CPU_EXPERT_CACHE", "1") == "1" if cache is None else cache
+        function.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_int, ctypes.c_void_p, ctypes.c_size_t]
+        function.restype = ctypes.c_int
+        error = ctypes.create_string_buffer(1024)
+        if function(self.handle, selected, int(enabled), error, len(error)):
+            self.close()
+            raise ValueError(error.value.decode(errors="replace"))
+        self.performance.update(cpu_poll=selected, cpu_decode_cache=enabled)
+
+    def profile_summary(self, reset: bool = False) -> dict:
+        with self.profile_lock:
+            summary = dict(enabled=self.profile_enabled, performance=dict(self.performance),
+                           backends={key: dict(value) for key, value in self.profile_totals.items()},
+                           timing_note="Blocking bridge wall time; profiling adds no CUDA synchronization")
+            if reset:
+                self.profile_totals.clear()
+        return summary
+
+    def record_profile(self, layer: int, tokens: int, started: float,
+                       native_started: float, native_finished: float, finished: float) -> None:
+        backend = "gpu" if layer >= 40 - self.gpu_layers else "cpu"
+        with self.profile_lock:
+            values = self.profile_totals.setdefault(backend, dict(calls=0, tokens=0,
+                wall_seconds=0.0, native_seconds=0.0, host_staging_seconds=0.0))
+            values["calls"] += 1
+            values["tokens"] += tokens
+            values["wall_seconds"] += finished - started
+            values["native_seconds"] += native_finished - native_started
+            values["host_staging_seconds"] += native_started - started + finished - native_finished
 
     def open_cuda(self, model: Path, layers: int, headroom: int | None,
                   error: ctypes.Array) -> int:
@@ -94,18 +153,57 @@ class ExpertBridge:
             raise ValueError("Expert IDs and weights must have shape [tokens, 8]")
         if ids.dtype not in (torch.int32, torch.int64):
             raise ValueError("Expert IDs must be integer tensors")
+        if self.uses_device_bridge(layer, x):
+            return self.forward_device(layer, x, ids, weights)
+        profiling = self.profile_enabled
+        started = time.perf_counter() if profiling else 0.0
         values = np.ascontiguousarray(x.float().cpu().numpy())
         indexes = np.ascontiguousarray(ids.int().cpu().numpy())
         mixing = np.ascontiguousarray(weights.float().cpu().numpy())
         output = np.empty_like(values)
         error = ctypes.create_string_buffer(1024)
+        native_started = time.perf_counter() if profiling else 0.0
         status = self.library.drama3_experts(
             self.handle, layer, len(values), values.ctypes.data, indexes.ctypes.data,
             mixing.ctypes.data, output.ctypes.data, self.threads, error, len(error),
         )
         if status:
             raise RuntimeError(error.value.decode(errors="replace"))
-        return torch.from_numpy(output).to(device=x.device, dtype=x.dtype)
+        native_finished = time.perf_counter() if profiling else 0.0
+        result = torch.from_numpy(output).to(device=x.device, dtype=x.dtype)
+        if profiling:
+            self.record_profile(layer, len(values), started, native_started,
+                                native_finished, time.perf_counter())
+        return result
+
+    def uses_device_bridge(self, layer: int, x: torch.Tensor) -> bool:
+        return (self.device_enabled and x.is_cuda and x.device == torch.device("cuda:0")
+                and x.shape[0] >= self.device_min_tokens and layer >= 40 - self.gpu_layers)
+
+    def forward_device(self, layer: int, x: torch.Tensor, ids: torch.Tensor,
+                       weights: torch.Tensor) -> torch.Tensor:
+        if x.device != torch.device("cuda:0"):
+            raise ValueError("CUDA device expert bridge supports cuda:0 only")
+        profiling = self.profile_enabled
+        started = time.perf_counter() if profiling else 0.0
+        values = x.float().contiguous()
+        indexes = np.ascontiguousarray(ids.int().cpu().numpy())
+        mixing = np.ascontiguousarray(weights.float().cpu().numpy())
+        output = torch.empty_like(values)
+        error = ctypes.create_string_buffer(1024)
+        native_started = time.perf_counter() if profiling else 0.0
+        with torch.cuda.device(x.device):
+            status = self.device_entry(self.handle, layer, len(values), values.data_ptr(),
+                                      indexes.ctypes.data, mixing.ctypes.data, output.data_ptr(),
+                                      self.threads, error, len(error))
+        if status:
+            raise RuntimeError(error.value.decode(errors="replace"))
+        native_finished = time.perf_counter() if profiling else 0.0
+        result = output.to(dtype=x.dtype)
+        if profiling:
+            self.record_profile(layer, len(values), started, native_started,
+                                native_finished, time.perf_counter())
+        return result
 
 
 class NativeExperts(torch.nn.Module):
@@ -263,6 +361,7 @@ def load_model_placed(bundle: Path, threads: int = 8, gpu_layers: int | None = N
     model, bridge = load_model(bundle, threads=threads, gpu_layers=0)
     try:
         ensure_drama3_caches(model, cache_capacity)
+        acceleration = prepare_hybrid_tower(model)
         torch.cuda.synchronize(0)
         torch.cuda.empty_cache()
         free, total = torch.cuda.mem_get_info(0)
@@ -274,6 +373,7 @@ def load_model_placed(bundle: Path, threads: int = 8, gpu_layers: int | None = N
                 raise ValueError("Requested GPU expert layers exceed available VRAM after headroom/workspace")
             placement.update(gpu_expert_layers=gpu_layers, expert_bytes=required)
         placement["placement_mode"] = "auto" if gpu_layers is None else "manual"
+        placement["tower_graphs"] = acceleration
         placement.update(cache_capacity=cache_capacity, planned_gpu_expert_layers=placement["gpu_expert_layers"])
         bridge = allocate_auto_experts(bundle, model, bridge, threads, placement, sizes,
                                        automatic=gpu_layers is None)
@@ -284,7 +384,25 @@ def load_model_placed(bundle: Path, threads: int = 8, gpu_layers: int | None = N
         return model, bridge, placement
     except BaseException:
         bridge.close()
+        tower = getattr(model, "audio_decoder", None)
+        if tower is not None and "_hybrid_decode_graphs" in vars(tower):
+            from fish_drama3.tower_graphs import uninstall_tower_graphs
+            uninstall_tower_graphs(model)
         raise
+
+
+def prepare_hybrid_tower(model: Any) -> dict:
+    """Reserve optional tower graph buffers before counting free expert VRAM."""
+    if os.environ.get("FISH_DRAMA3_TOWER_GRAPH", "0") != "1":
+        return dict(enabled=False, reason="disabled")
+    from fish_drama3.tower_graphs import prepare_tower_graphs
+    try:
+        return prepare_tower_graphs(model)
+    except (RuntimeError, NotImplementedError) as error:
+        # The installer rolls back to eager decode on failed capture.
+        print(f"Tower CUDA graphs unavailable; using eager decode: {error}", flush=True)
+        torch.cuda.empty_cache()
+        return dict(enabled=False, reason=str(error))
 
 
 def copy_parameters(backbone, tower, tensors: dict) -> None:

@@ -106,6 +106,25 @@ def test_load_starts_one_persistent_worker_then_unload(studio, monkeypatch):
     assert spawn.call_count == 2
 
 
+def test_worker_uses_validated_acceleration_without_overriding_user(studio, monkeypatch):
+    monkeypatch.setattr(web_service, "model_options", lambda data: dict(bundle="model", codec="codec"))
+    spawn = Mock(return_value=fake_worker())
+    monkeypatch.setattr(web_service.subprocess, "Popen", spawn)
+    monkeypatch.setattr(web_service.threading, "Thread", Mock())
+    monkeypatch.delenv("OMP_WAIT_POLICY", raising=False)
+    monkeypatch.delenv("FISH_DRAMA3_TOWER_GRAPH", raising=False)
+    studio.load({})
+    assert spawn.call_args.kwargs["env"]["OMP_WAIT_POLICY"] == "ACTIVE"
+    assert spawn.call_args.kwargs["env"]["FISH_DRAMA3_TOWER_GRAPH"] == "1"
+    studio.stop()
+    spawn.return_value = fake_worker()
+    monkeypatch.setenv("OMP_WAIT_POLICY", "PASSIVE")
+    monkeypatch.setenv("FISH_DRAMA3_TOWER_GRAPH", "0")
+    studio.load({})
+    assert spawn.call_args.kwargs["env"]["OMP_WAIT_POLICY"] == "PASSIVE"
+    assert spawn.call_args.kwargs["env"]["FISH_DRAMA3_TOWER_GRAPH"] == "0"
+
+
 def test_cancel_kills_worker_if_termination_times_out(studio):
     process = fake_worker()
     process.wait.side_effect = [subprocess.TimeoutExpired("worker", 15), 0]

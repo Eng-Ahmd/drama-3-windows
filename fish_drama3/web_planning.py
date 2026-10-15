@@ -62,7 +62,8 @@ def generation_plan(options: dict) -> dict:
     recommended = min(maximum, math.ceil(conservative * 1.15 / 128) * 128)
     return dict(mode=mode, characters=len(text), words=speech_units(text),
                 segments=len(chunks), estimated_frames=expected,
-                estimated_seconds=expected * FRAME_SECONDS, max_frames=budget,
+                estimated_seconds=expected * FRAME_SECONDS,
+                conservative_seconds=conservative * FRAME_SECONDS, max_frames=budget,
                 budget_seconds=budget * FRAME_SECONDS, risk=risk, warnings=warnings,
                 recommended_mode="chunked" if risk != "low" else mode,
                 recommended_chunk_length=recommended_chunk_length(text),
